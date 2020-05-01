@@ -1,1 +1,8 @@
-{"VoiceEnable":true,"Voice":"Microsoft Eva Mobile","VoiceRate":2,"VoiceVolume":100}
+{
+  "VoiceEnable": true,
+  "Voice": "Microsoft Eva Mobile",
+  "VoiceRate": 2,
+  "VoiceVolume": 100,
+  "JournalReplaySpeed": 87,
+  "BreakOnFSDJump": false
+}
