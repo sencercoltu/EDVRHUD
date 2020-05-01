@@ -42,7 +42,7 @@ namespace EDVRHUD.HUDs
                     //show warning if blackhole, neutronstar, white-dwarf etc
                     {
                         var sc = eventData.GetProperty("StarClass", "");
-                        if (!string.IsNullOrEmpty("sc"))
+                        if (!string.IsNullOrEmpty(sc))
                         {
                             if (EDCommon.StarLookup.TryGetValue(sc, out var star))
                             {
