@@ -35,8 +35,12 @@
             this.label2 = new System.Windows.Forms.Label();
             this.tbVolume = new System.Windows.Forms.TrackBar();
             this.btnApply = new System.Windows.Forms.Button();
+            this.label3 = new System.Windows.Forms.Label();
+            this.tbJournalReplay = new System.Windows.Forms.TrackBar();
+            this.chkFSDBreak = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.tbRate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tbVolume)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.tbJournalReplay)).BeginInit();
             this.SuspendLayout();
             // 
             // chkVoiceEnable
@@ -79,7 +83,7 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(10, 83);
+            this.label2.Location = new System.Drawing.Point(10, 72);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(42, 13);
             this.label2.TabIndex = 5;
@@ -87,7 +91,7 @@
             // 
             // tbVolume
             // 
-            this.tbVolume.Location = new System.Drawing.Point(49, 78);
+            this.tbVolume.Location = new System.Drawing.Point(49, 67);
             this.tbVolume.Maximum = 100;
             this.tbVolume.Name = "tbVolume";
             this.tbVolume.Size = new System.Drawing.Size(271, 45);
@@ -95,7 +99,7 @@
             // 
             // btnApply
             // 
-            this.btnApply.Location = new System.Drawing.Point(245, 134);
+            this.btnApply.Location = new System.Drawing.Point(245, 187);
             this.btnApply.Name = "btnApply";
             this.btnApply.Size = new System.Drawing.Size(75, 23);
             this.btnApply.TabIndex = 6;
@@ -103,11 +107,41 @@
             this.btnApply.UseVisualStyleBackColor = true;
             this.btnApply.Click += new System.EventHandler(this.btnApply_Click);
             // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(10, 125);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(111, 13);
+            this.label3.TabIndex = 7;
+            this.label3.Text = "Journal Replay Speed";
+            // 
+            // tbJournalReplay
+            // 
+            this.tbJournalReplay.Location = new System.Drawing.Point(129, 117);
+            this.tbJournalReplay.Maximum = 100;
+            this.tbJournalReplay.Name = "tbJournalReplay";
+            this.tbJournalReplay.Size = new System.Drawing.Size(191, 45);
+            this.tbJournalReplay.TabIndex = 8;
+            // 
+            // chkFSDBreak
+            // 
+            this.chkFSDBreak.AutoSize = true;
+            this.chkFSDBreak.Location = new System.Drawing.Point(12, 159);
+            this.chkFSDBreak.Name = "chkFSDBreak";
+            this.chkFSDBreak.Size = new System.Drawing.Size(118, 17);
+            this.chkFSDBreak.TabIndex = 9;
+            this.chkFSDBreak.Text = "Break on FSDJump";
+            this.chkFSDBreak.UseVisualStyleBackColor = true;
+            // 
             // SettingsForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(332, 169);
+            this.ClientSize = new System.Drawing.Size(332, 222);
+            this.Controls.Add(this.chkFSDBreak);
+            this.Controls.Add(this.tbJournalReplay);
+            this.Controls.Add(this.label3);
             this.Controls.Add(this.btnApply);
             this.Controls.Add(this.tbVolume);
             this.Controls.Add(this.tbRate);
@@ -125,6 +159,7 @@
             this.Text = "EDVRHUD Settings";
             ((System.ComponentModel.ISupportInitialize)(this.tbRate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tbVolume)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.tbJournalReplay)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -139,5 +174,8 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.TrackBar tbVolume;
         private System.Windows.Forms.Button btnApply;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.TrackBar tbJournalReplay;
+        private System.Windows.Forms.CheckBox chkFSDBreak;
     }
 }

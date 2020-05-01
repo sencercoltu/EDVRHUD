@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace EDVRHUD
@@ -21,6 +15,8 @@ namespace EDVRHUD
             cmbVoices.SelectedItem = NotificationApp.Settings.Voice;
             tbRate.Value = NotificationApp.Settings.VoiceRate;
             tbVolume.Value = NotificationApp.Settings.VoiceVolume;
+            tbJournalReplay.Value = NotificationApp.Settings.JournalReplaySpeed;
+            chkFSDBreak.Checked = NotificationApp.Settings.BreakOnFSDJump;
         }
 
         private void chkVoiceEnable_CheckedChanged(object sender, EventArgs e)
@@ -36,6 +32,8 @@ namespace EDVRHUD
             NotificationApp.Settings.VoiceVolume = tbVolume.Value;
             NotificationApp.Settings.Voice = cmbVoices.SelectedItem.ToString();
             NotificationApp.Settings.VoiceEnable = chkVoiceEnable.Checked;
+            NotificationApp.Settings.JournalReplaySpeed = tbJournalReplay.Value;
+            NotificationApp.Settings.BreakOnFSDJump = chkFSDBreak.Checked;
             NotificationApp.SaveSettings();
         }
     }

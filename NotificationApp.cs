@@ -27,6 +27,8 @@ namespace EDVRHUD
             public string Voice { get; set; } = "";
             public int VoiceRate { get; set; } = 4; //-10 to 10
             public int VoiceVolume { get; set; } = 100; //0 to 100
+            public int JournalReplaySpeed { get; set; } = 10;
+            public bool BreakOnFSDJump { get; set; } = true;
         }
 
         public static HudSettings Settings { get; set; } = new HudSettings();
@@ -62,12 +64,22 @@ namespace EDVRHUD
 
         private MenuItem PanelsMenu;
         private MenuItem SettingsMenu;
+        private MenuItem ReplayMenu;
+
+        private string EDJournalPath;
+        private FileSystemWatcher EDLogWatcher;
+        private Thread EDJournalReplayThread;
+        public static bool ReplayNextSystem = false;
+
 
         public NotificationApp()
         {
             PanelsMenu = new MenuItem("Panels");
             SettingsMenu = new MenuItem("Settings...");
             SettingsMenu.Click += SettingsMenu_Click;
+            ReplayMenu = new MenuItem("Replay Journal...");
+            ReplayMenu.Click += ReplayMenu_Click;
+
             TrayIcon = new NotifyIcon()
             {
                 Icon = Properties.Resources.Icon,
@@ -81,6 +93,7 @@ namespace EDVRHUD
                         new MenuItem("-"),
                         PanelsMenu,
                         new MenuItem("-"),
+                        ReplayMenu,
                         SettingsMenu,
                         new MenuItem("Exit", Exit)
                     }),
@@ -89,6 +102,79 @@ namespace EDVRHUD
             AppRunning = true;
         }
 
+        private void ReplayMenu_Click(object sender, EventArgs e)
+        {
+            //select file
+            string[] filenames = new string[0];
+            using (var ofd = new OpenFileDialog())
+            {
+                ofd.Multiselect = true;
+                ofd.InitialDirectory = EDJournalPath;
+                ofd.Filter = "Elite Dangerous Journal|Journal.????????????.??.log";
+                ofd.Title = "Please select journal to replay";
+                ofd.DefaultExt = ".log";
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    filenames = ofd.FileNames.OrderBy(f => f).ToArray();
+                }
+            }
+
+            if (filenames.Length == 0)
+                return;
+
+            EDLogWatcher.EnableRaisingEvents = false;
+            ReplayMenu.Enabled = false;
+
+            EDJournalReplayThread = new Thread(() =>
+            {
+                //var usedEvents = new[] { "StarClass", "JetConeBoost", "StartJump", "FSDTarget", "FSDJump", "DiscoveryScan", "FSSSignalDiscovered", "FSSDiscoveryScan", "FSSAllBodiesFound", "Scan" };
+                
+                lock (ContentLock)
+                    CachedContent = "";
+                LastJournalTimeStamp = DateTime.MinValue;
+
+                foreach (var filename in filenames)
+                {
+                    if (!AppRunning)
+                        return;
+                    var content = File.ReadAllText(filename);
+                    var lines = content.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                    foreach (var line in lines)
+                    {
+                        if (string.IsNullOrEmpty(line))
+                            continue;
+
+                        //if (!usedEvents.Any(e => line.Contains("\"" + e + "\"")))
+                        //    continue;
+                        if (Settings.BreakOnFSDJump)
+                        {
+                            if (line.Contains("\"event\":\"FSDJump\","))
+                            {
+                                while (true)
+                                {
+                                    if (!AppRunning)
+                                        return;
+                                    if (ReplayNextSystem)
+                                    {
+                                        ReplayNextSystem = false;
+                                        break;
+                                    }
+                                    Thread.Sleep(100);
+                                }
+                            }
+                        }
+                        lock (ContentLock)
+                            CachedContent += line + Environment.NewLine;
+                        if (!AppRunning)
+                            break;
+
+                        Thread.Sleep((100 - Settings.JournalReplaySpeed + 1) * 10);
+                    }
+                }
+            })
+            { IsBackground = true };
+            EDJournalReplayThread.Start();
+        }
 
         public static SettingsForm SettingsForm { get; set; } = null;
 
@@ -142,6 +228,8 @@ namespace EDVRHUD
             Speech.SelectVoice(Settings.Voice);
             Speech.Rate = Settings.VoiceRate;
             Speech.Volume = Settings.VoiceVolume;
+            if (!Settings.BreakOnFSDJump)
+                ReplayNextSystem = true;
         }
 
         private string CommanderName { get; set; }
@@ -218,8 +306,6 @@ namespace EDVRHUD
             m11 = -0.5f
         };
 
-        public static bool SimulateNextSystem = false;
-
         public void Run()
         {
             LoadSettings();
@@ -267,119 +353,71 @@ namespace EDVRHUD
 
                         LoadPanels(null, null);
 
-                        var journalPath = GetSavedGamesPath() + "\\Frontier Developments\\Elite Dangerous";
+                        EDJournalPath = GetSavedGamesPath() + "\\Frontier Developments\\Elite Dangerous";
 
-                        var journalReplayThread = new Thread(() =>
-                        {
-                            //var usedEvents = new[] { "StarClass", "JetConeBoost", "StartJump", "FSDTarget", "FSDJump", "DiscoveryScan", "FSSSignalDiscovered", "FSSDiscoveryScan", "FSSAllBodiesFound", "Scan" };
-
-                            var journals = Directory.EnumerateFiles(journalPath, "Journal.????????????.??.log").OrderBy(f => f).ToList();
-                            journals = journals.Skip(Math.Max(0, journals.Count() - 5)).ToList();
-                            foreach (var item in journals)
-                            {
-                                if (!AppRunning)
-                                    break;
-                                var content = File.ReadAllText(item);
-                                var lines = content.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                                foreach (var line in lines)
-                                {
-                                    if (string.IsNullOrEmpty(line))
-                                        continue;
-
-                                    //if (!usedEvents.Any(e => line.Contains("\"" + e + "\"")))
-                                    //    continue;
-
-                                    if (line.Contains("\"event\":\"FSDJump\","))
-                                    {
-                                        while (true)
-                                        {
-                                            if (!AppRunning)
-                                                return;
-                                            if (SimulateNextSystem)
-                                            {
-                                                SimulateNextSystem = false;
-                                                break;
-                                            }
-                                        }
-                                        Thread.Sleep(100);
-                                    }
-
-                                    lock (ContentLock)
-                                        CachedContent += line + Environment.NewLine;
-                                    if (!AppRunning)
-                                        break;
-                                }
-                            }
-                        })
-                        { IsBackground = true };
-                        //journalReplayThread.Start();
-
-                        var logWatcher = new FileSystemWatcher(journalPath, "Journal.????????????.??.log")
+                        EDLogWatcher = new FileSystemWatcher(EDJournalPath, "Journal.????????????.??.log")
                         {
                             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
                         };
-                        logWatcher.Changed += JournalChanged;
-                        logWatcher.Created += JournalChanged;
+                        EDLogWatcher.Changed += JournalChanged;
+                        EDLogWatcher.Created += JournalChanged;
 
-                        if (!journalReplayThread.IsAlive)
+                        //load last FSDJump 
+                        var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
+                        var jumpFound = false;
+                        while (true)
                         {
-                            //load last FSDJump 
-                            var files = Directory.EnumerateFiles(journalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
-                            var jumpFound = false;
-                            while (true)
-                            {
-                                LastJournalFile = files[0];
-                                files.RemoveAt(0);
+                            LastJournalFile = files[0];
+                            files.RemoveAt(0);
 
-                                LastJournalPosition = 0;
-                                ReadJournal();
-                                lock (ContentLock)
+                            LastJournalPosition = 0;
+                            ReadJournal();
+                            lock (ContentLock)
+                            {
+                                var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                                CachedContent = "";
+                                for (var i = lines.Length; i > 0; i--)
                                 {
-                                    var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);                                    
-                                    CachedContent = "";
-                                    for (var i = lines.Length; i > 0; i--)
+                                    var line = lines[i - 1];
+                                    CachedContent = line + Environment.NewLine + CachedContent;
+                                    if (line.Contains("\"event\":\"StartJump\","))
                                     {
-                                        var line = lines[i - 1];
-                                        CachedContent = line + Environment.NewLine + CachedContent;
-                                        if (line.Contains("\"event\":\"StartJump\","))
+                                        jumpFound = true;
+                                        break;
+                                    }
+                                }
+
+                                if (jumpFound)
+                                {
+                                    //get name
+                                    for (var i = 0; i < lines.Length; i++)
+                                    {
+                                        var json = Serializer.Deserialize<Dictionary<string, object>>(lines[i]);
+                                        if (json.GetProperty("event", "") == "Commander")
                                         {
-                                            jumpFound = true;
+                                            CommanderName = json.GetProperty("Name", "Unknown");
                                             break;
                                         }
                                     }
 
-                                    if (jumpFound)
-                                    {
-                                        //get name
-                                        for (var i=0; i<lines.Length; i++)
-                                        {
-                                            var json = Serializer.Deserialize<Dictionary<string, object>>(lines[i]);
-                                            if (json.GetProperty("event", "") == "Commander")
-                                            {
-                                                CommanderName = json.GetProperty("Name", "Unknown");
-                                                break;
-                                            }
-                                        }
-                                        
-                                    }
-
                                 }
-                                if (jumpFound)
-                                    break;
-                                else
-                                    lock (ContentLock)
-                                        CachedContent = "";
+
                             }
-                            logWatcher.EnableRaisingEvents = true;
+                            if (jumpFound)
+                                break;
+                            else
+                                lock (ContentLock)
+                                    CachedContent = "";
                         }
+                        EDLogWatcher.EnableRaisingEvents = true;
+
 
                         var HudIsHidden = false;
 
                         var HideEvents = new[] { "Shutdown", "LaunchSRV" };
                         var ShowEvents = new[] { "DockSRV" };
 
-                        Talk("Welcome Commander " + CommanderName +". This is the Explorers Virtual Reality Heads Up Display Extension for Elite Dangerous.", false);
-
+                        Talk("Welcome Commander " + CommanderName + ".", false);
 
                         while (AppRunning)
                         {
@@ -484,14 +522,14 @@ namespace EDVRHUD
                             Application.DoEvents();
 
                         }
-                        if (journalReplayThread.IsAlive)
-                            journalReplayThread.Join();
-                        journalReplayThread = null;
+                        if (EDJournalReplayThread.IsAlive)
+                            EDJournalReplayThread.Join();
+                        EDJournalReplayThread = null;
 
 
-                        logWatcher.EnableRaisingEvents = false;
-                        logWatcher.Dispose();
-                        logWatcher = null;
+                        EDLogWatcher.EnableRaisingEvents = false;
+                        EDLogWatcher.Dispose();
+                        EDLogWatcher = null;
 
                         foreach (var p in HudPanels)
                             p.Dispose();

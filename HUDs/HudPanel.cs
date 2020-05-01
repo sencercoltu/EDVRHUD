@@ -362,7 +362,7 @@ namespace EDVRHUD
 
                 HudPreview.KeyPress += (sender, args) =>
                 {                    
-                    NotificationApp.SimulateNextSystem = true;
+                    NotificationApp.ReplayNextSystem = true;
                 };
 
                 HudPreview.MouseDown += (sender, args) =>
