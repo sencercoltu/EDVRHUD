@@ -111,7 +111,7 @@ namespace EDVRHUD
                 ofd.Multiselect = true;
                 ofd.InitialDirectory = EDJournalPath;
                 ofd.Filter = "Elite Dangerous Journal|Journal.????????????.??.log";
-                ofd.Title = "Please select journal to replay";
+                ofd.Title = "Please select one or more journals to replay";
                 ofd.DefaultExt = ".log";
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
@@ -209,11 +209,14 @@ namespace EDVRHUD
         private static void LoadSettings()
         {
             var path = Environment.CurrentDirectory + "\\Settings.json";
+            string content;
             if (File.Exists(path))
-            {
-                var content = File.ReadAllText(path);
-                Settings = Serializer.Deserialize<HudSettings>(content);
-            }
+                content = File.ReadAllText(path);
+            else
+                content = Encoding.UTF8.GetString(Properties.Resources.Settings);
+
+            Settings = Serializer.Deserialize<HudSettings>(content);
+            
             if (string.IsNullOrEmpty(Settings.Voice))
             {
                 var voice = Speech.GetInstalledVoices().FirstOrDefault(s => s.VoiceInfo.Gender == VoiceGender.Female);
@@ -265,9 +268,12 @@ namespace EDVRHUD
             HudPanels.Clear();
 
             var path = Environment.CurrentDirectory + "\\Panels.json";
-            var s = File.ReadAllText(path);
-            var json = Serializer.Deserialize<PanelSaveData>(s);
-
+            string content;
+            if (File.Exists(path))
+                content = File.ReadAllText(path);
+            else
+                content = Encoding.UTF8.GetString(Properties.Resources.Panels);
+            var json = Serializer.Deserialize<PanelSaveData>(content);
             foreach (var panelData in json.panels)
             {
                 var panel = HudPanel.Create(panelData);
@@ -363,6 +369,7 @@ namespace EDVRHUD
                         EDLogWatcher.Created += JournalChanged;
 
                         //load last FSDJump 
+                        var skippedFiles = new List<string>();
                         var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
                         var jumpFound = false;
                         while (true)
@@ -379,8 +386,11 @@ namespace EDVRHUD
                                 for (var i = lines.Length; i > 0; i--)
                                 {
                                     var line = lines[i - 1];
-                                    CachedContent = line + Environment.NewLine + CachedContent;
-                                    if (line.Contains("\"event\":\"StartJump\","))
+                                    if (string.IsNullOrEmpty(line))
+                                        continue;
+                                    if (!line.Contains("\"event\":\"Shutdown\"")) //skip shutdowns
+                                        CachedContent = line + Environment.NewLine + CachedContent;
+                                    if (line.Contains("\"event\":\"StartJump\""))
                                     {
                                         jumpFound = true;
                                         break;
@@ -404,10 +414,20 @@ namespace EDVRHUD
 
                             }
                             if (jumpFound)
-                                break;
+                            {
+                                if (skippedFiles.Count > 0)
+                                {
+                                    files = skippedFiles;
+                                }
+                                else
+                                    break;
+                            }
                             else
+                            {
                                 lock (ContentLock)
                                     CachedContent = "";
+                                skippedFiles.Add(LastJournalFile);
+                            }
                         }
                         EDLogWatcher.EnableRaisingEvents = true;
 
@@ -477,7 +497,6 @@ namespace EDVRHUD
                                                     p.RefreshUpdate();
                                                 }
                                             }
-
                                             else if (HideEvents.Contains(eventtype))
                                             {
                                                 foreach (var p in HudPanels)
@@ -522,7 +541,7 @@ namespace EDVRHUD
                             Application.DoEvents();
 
                         }
-                        if (EDJournalReplayThread.IsAlive)
+                        if (EDJournalReplayThread != null && EDJournalReplayThread.IsAlive)
                             EDJournalReplayThread.Join();
                         EDJournalReplayThread = null;
 
