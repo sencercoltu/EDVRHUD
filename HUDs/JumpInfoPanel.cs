@@ -35,10 +35,13 @@ namespace EDVRHUD.HUDs
                 case "StartJump":
                     //started charging
                     {
-                        if (EDCommon.StarLookup.TryGetValue(eventData.GetProperty("StarClass", "Unknown"), out var star))
-                            TargetStarType = star.TypeName;
-                        TargetStarSystem = eventData.GetProperty("StarSystem", "Unknown");
-                        Redraw();
+                        if (eventData.GetProperty("JumpType", "") == "Hyperspace")
+                        {
+                            if (EDCommon.StarLookup.TryGetValue(eventData.GetProperty("StarClass", "Unknown"), out var star))
+                                TargetStarType = star.TypeName;
+                            TargetStarSystem = eventData.GetProperty("StarSystem", "Unknown");
+                            Redraw();
+                        }
                     }
                     break;
                 case "FSDTarget":
@@ -52,7 +55,8 @@ namespace EDVRHUD.HUDs
                     //end jump
                     {
                         //reset jcb
-                        NotificationApp.Shutup();
+                        if (RemainingJumps == 1) RemainingJumps = 0;
+                        NotificationApp.Shutup();                        
                         JetConeBoost = 1;
                         Redraw();                        
                     }

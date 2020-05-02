@@ -214,6 +214,8 @@ namespace EDVRHUD.HUDs
                     {
                         if (eventData.GetProperty("BodyID", -1, out var bodyId))
                         {
+                            var bodyName = eventData.GetProperty("BodyName", "");
+                            if (bodyName.EndsWith(" Ring")) return;
                             //skip asteriod belts                            
                             var parents = eventData.GetProperty("Parents", null as ArrayList) ?? new ArrayList();
                             foreach (Dictionary<string, object> parent in parents)
@@ -226,7 +228,7 @@ namespace EDVRHUD.HUDs
                             }
 
                             var discovered = eventData.GetProperty("WasDiscovered", false);
-                            var mapped = eventData.GetProperty("WasDiscovered", false);
+                            var mapped = eventData.GetProperty("WasDiscovered", false);                            
 
                             var starType = eventData.GetProperty("StarType", "");
 
@@ -235,7 +237,7 @@ namespace EDVRHUD.HUDs
                                 body = new BodyInfo
                                 {
                                     BodyID = bodyId,
-                                    Name = eventData.GetProperty("BodyName", "")
+                                    Name = bodyName
                                 };
 
 
@@ -332,7 +334,7 @@ namespace EDVRHUD.HUDs
                                 if (body.Value > 20000)
                                 {
                                     var val = ((int)(body.Value / 1000) * 1000).ToString("N0");
-                                    NotificationApp.Talk("Scanned " + body.TerraformState + " " + body.FullName + " for " + val + " credits.");
+                                    NotificationApp.Talk("Scanned " + body.Name + "," + body.TerraformState + " " + body.BodyType + " for " + val + " credits.");
                                 }
 
                                 var featureText = "";
@@ -361,7 +363,7 @@ namespace EDVRHUD.HUDs
                                     featureText += "Body has " + body.Rings + " rings.";
 
                                 if (!string.IsNullOrEmpty(featureText))                                    
-                                    NotificationApp.Talk(body.TerraformState + " " + body.FullName + " scan complete." + featureText);
+                                    NotificationApp.Talk(body.Name + "," + body.TerraformState + " " + body.BodyType + " scan complete." + featureText);
                             }
 
                             Redraw();

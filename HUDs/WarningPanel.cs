@@ -41,25 +41,28 @@ namespace EDVRHUD.HUDs
                 case "StartJump":
                     //show warning if blackhole, neutronstar, white-dwarf etc
                     {
-                        var sc = eventData.GetProperty("StarClass", "");
-                        if (!string.IsNullOrEmpty(sc))
+                        if (eventData.GetProperty("JumpType", "") == "Hyperspace")
                         {
-                            if (EDCommon.StarLookup.TryGetValue(sc, out var star))
+                            var sc = eventData.GetProperty("StarClass", "");
+                            if (!string.IsNullOrEmpty(sc))
                             {
-                                if (star.Type == EDCommon.StarType.Dangerous)
+                                if (EDCommon.StarLookup.TryGetValue(sc, out var star))
                                 {
-                                    DangerousStarName = star.PlainName;
-                                    ShowPanel(true);
+                                    if (star.Type == EDCommon.StarType.Dangerous)
+                                    {
+                                        DangerousStarName = star.PlainName;
+                                        ShowPanel(true);
+                                    }
+                                    else
+                                        DangerousStarName = "";
                                 }
                                 else
-                                    DangerousStarName = "";
+                                    DangerousStarName = "Unknown star (" + sc + ")";
+                                Redraw();
+                                //NotificationApp.Speech.SpeakAsyncCancelAll();
+                                if (!string.IsNullOrEmpty(DangerousStarName))
+                                    NotificationApp.Talk("Warning! Target is a " + DangerousStarName + ".");
                             }
-                            else
-                                DangerousStarName = "Unknown star (" + sc + ")";
-                            Redraw();
-                            //NotificationApp.Speech.SpeakAsyncCancelAll();
-                            if (!string.IsNullOrEmpty(DangerousStarName))
-                                NotificationApp.Talk("Warning! Target star " + DangerousStarName + " is dangerous.");
                         }
                     }
                     break;
