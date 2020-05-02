@@ -31,12 +31,17 @@ namespace EDVRHUD
             public bool BreakOnFSDJump { get; set; } = true;
         }
 
+        public static bool InitialLoad = false;
+
         public static HudSettings Settings { get; set; } = new HudSettings();
 
         internal static SpeechSynthesizer Speech = new SpeechSynthesizer();
 
         public static void Talk(string s, bool async = true)
         {
+            if (InitialLoad)
+                return;
+
             if (Settings.VoiceEnable)
             {
                 if (async) Speech.SpeakAsync(s);
@@ -128,7 +133,7 @@ namespace EDVRHUD
             EDJournalReplayThread = new Thread(() =>
             {
                 //var usedEvents = new[] { "StarClass", "JetConeBoost", "StartJump", "FSDTarget", "FSDJump", "DiscoveryScan", "FSSSignalDiscovered", "FSSDiscoveryScan", "FSSAllBodiesFound", "Scan" };
-                
+
                 lock (ContentLock)
                     CachedContent = "";
                 LastJournalTimeStamp = DateTime.MinValue;
@@ -216,7 +221,7 @@ namespace EDVRHUD
                 content = Encoding.UTF8.GetString(Properties.Resources.Settings);
 
             Settings = Serializer.Deserialize<HudSettings>(content);
-            
+
             if (string.IsNullOrEmpty(Settings.Voice))
             {
                 var voice = Speech.GetInstalledVoices().FirstOrDefault(s => s.VoiceInfo.Gender == VoiceGender.Female);
@@ -368,10 +373,13 @@ namespace EDVRHUD
                         EDLogWatcher.Changed += JournalChanged;
                         EDLogWatcher.Created += JournalChanged;
 
+                        InitialLoad = true;
+
                         //load last FSDJump 
                         var skippedFiles = new List<string>();
                         var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
                         var jumpFound = false;
+
                         while (true)
                         {
                             LastJournalFile = files[0];
@@ -390,7 +398,7 @@ namespace EDVRHUD
                                         continue;
                                     if (!line.Contains("\"event\":\"Shutdown\"")) //skip shutdowns
                                         CachedContent = line + Environment.NewLine + CachedContent;
-                                    if (line.Contains("\"event\":\"StartJump\""))
+                                    if (line.Contains("\"event\":\"StartJump\", \"JumpType\":\"Hyperspace\""))
                                     {
                                         jumpFound = true;
                                         break;
@@ -429,18 +437,28 @@ namespace EDVRHUD
                                 skippedFiles.Add(LastJournalFile);
                             }
                         }
-                        EDLogWatcher.EnableRaisingEvents = true;
-
 
                         var HudIsHidden = false;
 
                         var HideEvents = new[] { "Shutdown", "LaunchSRV" };
                         var ShowEvents = new[] { "DockSRV" };
 
-                        Talk("Welcome Commander " + CommanderName + ".", false);
+                        if (Settings.VoiceEnable)
+                            Speech.Speak("Welcome Commander " + CommanderName + ".");
 
                         while (AppRunning)
                         {
+                            if (InitialLoad)
+                            {
+                                lock(ContentLock)
+                                {
+                                    if (string.IsNullOrEmpty(CachedContent))
+                                    {
+                                        InitialLoad = false;
+                                        EDLogWatcher.EnableRaisingEvents = true;
+                                    }
+                                }
+                            }
 #if UseOpenVR
                             while (vrSystem.PollNextEvent(ref vrEvent, vrEventSize))
                             {
