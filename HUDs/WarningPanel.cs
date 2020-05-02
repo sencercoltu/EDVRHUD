@@ -10,7 +10,12 @@ namespace EDVRHUD.HUDs
     {
         private string DangerousStarName = "";
 
-        public WarningPanel(Size size, ref HmdMatrix34_t position) : base(HudType.Warning, "Warning", size, position)
+        //public WarningPanel(Size size, ref HmdMatrix34_t position) : base(HudType.Warning, "Warning", size, position)
+        //{
+        //    ShowPanel(false);
+        //}
+
+        public WarningPanel(PanelSettings settings) : base("Warning", settings)
         {
             ShowPanel(false);
         }
@@ -32,6 +37,7 @@ namespace EDVRHUD.HUDs
         {
             base.EndModifyOverlay();
             DangerousStarName = "";
+            ShowPanel(false);
         }
 
         public override void JournalUpdate(string eventType, Dictionary<string, object> eventData)
@@ -63,6 +69,12 @@ namespace EDVRHUD.HUDs
                                 if (!string.IsNullOrEmpty(DangerousStarName))
                                     NotificationApp.Talk("Warning! Target is a " + DangerousStarName + ".");
                             }
+                        }
+                        else
+                        {
+                            DangerousStarName = "";
+                            Redraw();
+                            ShowPanel(false);
                         }
                     }
                     break;

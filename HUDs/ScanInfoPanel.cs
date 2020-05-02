@@ -116,10 +116,24 @@ namespace EDVRHUD.HUDs
 
         private Font PanelFont;
 
-        public ScanInfoPanel(Size size, ref HmdMatrix34_t position) : base(HudType.ScanInfo, "ScanInfo", size, position)
+        //public ScanInfoPanel(Size size, ref HmdMatrix34_t position) : base(HudType.ScanInfo, "ScanInfo", size, position)
+        //{
+        //    PanelFont = new Font(NotificationApp.EDFont.FontFamily, 18);
+        //}
+
+        public ScanInfoPanel(PanelSettings settings) : base("ScanInfo", settings)
         {
             PanelFont = new Font(NotificationApp.EDFont.FontFamily, 18);
         }
+
+        internal override void GUIFocusChanged(int guiFocus)
+        {
+            if (guiFocus == 4)
+                ShowPanel(false);
+            else
+                ShowPanel(true);
+        }
+
 
         private System.Timers.Timer SignalTimer = null;
 
@@ -389,7 +403,7 @@ namespace EDVRHUD.HUDs
             }
         }
 
-        private readonly Brush BackgroundBrush = new SolidBrush(Color.FromArgb(100, 0, 0, 0));
+        private readonly Brush BackgroundBrush = new SolidBrush(Color.FromArgb(200, 0, 0, 0));
         private readonly Brush MappedBrush = new SolidBrush(Color.FromArgb(255, 250, 250, 50));
         private readonly Brush InterestBrush = new SolidBrush(Color.FromArgb(255, 0, 255, 0));
         private readonly Brush PreviouslyDiscoveredBrush = new SolidBrush(Color.FromArgb(125, 255, 100, 0));

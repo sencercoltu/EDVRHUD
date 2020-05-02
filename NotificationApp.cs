@@ -73,6 +73,7 @@ namespace EDVRHUD
 
         private string EDJournalPath;
         private FileSystemWatcher EDLogWatcher;
+        private FileSystemWatcher EDStatusWatcher;
         private Thread EDJournalReplayThread;
         public static bool ReplayNextSystem = false;
 
@@ -249,13 +250,7 @@ namespace EDVRHUD
             var list = new List<PanelSettings>();
             foreach (var panel in HudPanels)
             {
-                list.Add(new PanelSettings()
-                {
-                    Height = panel.PanelSize.Height,
-                    Width = panel.PanelSize.Width,
-                    Type = panel.Type,
-                    Position = panel.OverlayPosition
-                });
+                list.Add(panel.Settings);
             }
             saveData.panels = list.ToArray();
 
@@ -365,6 +360,14 @@ namespace EDVRHUD
                         LoadPanels(null, null);
 
                         EDJournalPath = GetSavedGamesPath() + "\\Frontier Developments\\Elite Dangerous";
+
+                        EDStatusWatcher = new FileSystemWatcher(EDJournalPath, "Status.json")
+                        {
+                            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
+                        };
+                        EDStatusWatcher.Changed += StatusChanged;
+                        EDStatusWatcher.Created += StatusChanged;
+                        EDStatusWatcher.EnableRaisingEvents = true;
 
                         EDLogWatcher = new FileSystemWatcher(EDJournalPath, "Journal.????????????.??.log")
                         {
@@ -526,8 +529,20 @@ namespace EDVRHUD
                             }
 
                             bool anyUpdate = false;
+                            bool sendFocus = false;
+                            if (GUIFocus != PrevGUIFocus)
+                            {
+                                PrevGUIFocus = GUIFocus;
+                                sendFocus = true;                                
+                            }
+
                             foreach (var p in HudPanels)
                             {
+                                if (sendFocus)
+                                {
+                                    p.GUIFocusChanged(GUIFocus);
+                                    p.PanelUpdated = 2;
+                                }
                                 if (p.PanelUpdated > 0)
                                 {
                                     anyUpdate = true;
@@ -551,7 +566,7 @@ namespace EDVRHUD
                                 }
                             }
 
-                            if (!anyUpdate)
+                            if (!anyUpdate && !sendFocus)
                                 Thread.Sleep(100);
                             else
                                 Thread.Sleep(1);
@@ -567,6 +582,12 @@ namespace EDVRHUD
                         EDLogWatcher.EnableRaisingEvents = false;
                         EDLogWatcher.Dispose();
                         EDLogWatcher = null;
+
+                        EDStatusWatcher.EnableRaisingEvents = false;
+                        EDStatusWatcher.Dispose();
+                        EDStatusWatcher = null;
+
+                        
 
                         foreach (var p in HudPanels)
                             p.Dispose();
@@ -589,11 +610,21 @@ namespace EDVRHUD
         private DateTime LastJournalTimeStamp { get; set; } = DateTime.MinValue;
         private string CachedContent { get; set; }
         private object ContentLock = new object();
+        private int GUIFocus = 0;
+        private int PrevGUIFocus = -1;
 
+        private void StatusChanged(object sender, FileSystemEventArgs e)
+        {
+            if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
+            {
+                //Debug.WriteLine("Status file changed.");
+                ReadStatus(e.FullPath);
+            }
+        }
 
         private void JournalChanged(object sender, FileSystemEventArgs e)
         {
-            if (e.ChangeType == WatcherChangeTypes.Changed)
+            if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
             {
                 if (LastJournalFile != e.FullPath)
                 {
@@ -606,19 +637,44 @@ namespace EDVRHUD
             }
         }
 
+        private void ReadStatus(string fullPath)
+        {
+            try
+            {
+                using (var fs = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var bytes = new byte[fs.Length];
+                    fs.Read(bytes, 0, bytes.Length);
+                    var strcontent = Encoding.UTF8.GetString(bytes);
+                    var status = Serializer.Deserialize<Dictionary<string, object>>(strcontent);                    
+                    GUIFocus = status.GetProperty("GuiFocus", 0);
+                }
+            }
+            catch
+            {
+
+            }            
+        }
+
         private void ReadJournal()
         {
-            using (var fs = File.Open(LastJournalFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            try
             {
-                fs.Seek(LastJournalPosition, SeekOrigin.Begin);
-                var bytes = new byte[fs.Length - fs.Position];
-                fs.Read(bytes, 0, bytes.Length);
-                LastJournalPosition = fs.Length;
-                var strcontent = Encoding.UTF8.GetString(bytes);
-                lock (ContentLock)
-                    CachedContent += strcontent;
+                using (var fs = File.Open(LastJournalFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    fs.Seek(LastJournalPosition, SeekOrigin.Begin);
+                    var bytes = new byte[fs.Length - fs.Position];
+                    fs.Read(bytes, 0, bytes.Length);
+                    LastJournalPosition = fs.Length;
+                    var strcontent = Encoding.UTF8.GetString(bytes);
+                    lock (ContentLock)
+                        CachedContent += strcontent;
+                }
             }
+            catch
+            {
 
+            }
         }
 
         public static string GetSavedGamesPath()

@@ -1,4 +1,5 @@
 ﻿using EDVRHUD.HUDs;
+using EDVRHUD.Properties;
 using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
@@ -26,7 +27,8 @@ namespace EDVRHUD
         public HudType Type;
         public int Width;
         public int Height;
-        public HmdMatrix34_t Position;
+        public float Scale;
+        public HmdMatrix34_t Position;        
     }
 
     public class PanelSaveData
@@ -93,9 +95,7 @@ namespace EDVRHUD
 
         private Bitmap IntermediateBitmap = null;
 
-        public HmdMatrix34_t OverlayPosition { get { return _overlayPosition; } }
-
-        private HmdMatrix34_t _overlayPosition;
+        public HmdMatrix34_t OverlayPosition { get { return Settings.Position; } }
 
         private ulong OverlayHandle = 0;
 
@@ -111,34 +111,35 @@ namespace EDVRHUD
         private Texture2D RenderTexture;
         private RenderTargetView RenderView;
         private Texture_t OVRTexture;
+        public PanelSettings Settings;
 
         private IntPtr OffScreenPtr = IntPtr.Zero;
 
-        public HudPanel(HudType type, string name, Size size, HmdMatrix34_t position)
+        public HudPanel(string name, PanelSettings settings) //HudType type, string name, Size size, HmdMatrix34_t position)
         {
-            _overlayPosition = position;
-            Type = type;
+            Settings = settings;
+            Type = settings.Type;
             Name = name;
-            PanelSize = new Size(size.Width, size.Height);
-            TextureSize = new Size(size.Width * 2, size.Height * 2);
+            PanelSize = new Size(settings.Width, settings.Height);
+            TextureSize = new Size(settings.Width * 2, settings.Height * 2);
             OffScreenPtr = Marshal.AllocHGlobal(TextureSize.Width * TextureSize.Height * 4);
 
             var m = new Matrix()
             {
-                M11 = position.m0,
-                M12 = position.m1,
-                M13 = position.m2,
-                M14 = position.m3,
+                M11 = Settings.Position.m0,
+                M12 = Settings.Position.m1,
+                M13 = Settings.Position.m2,
+                M14 = Settings.Position.m3,
 
-                M21 = position.m4,
-                M22 = position.m5,
-                M23 = position.m6,
-                M24 = position.m7,
+                M21 = Settings.Position.m4,
+                M22 = Settings.Position.m5,
+                M23 = Settings.Position.m6,
+                M24 = Settings.Position.m7,
 
-                M31 = position.m8,
-                M32 = position.m9,
-                M33 = position.m10,
-                M34 = position.m11,
+                M31 = Settings.Position.m8,
+                M32 = Settings.Position.m9,
+                M33 = Settings.Position.m10,
+                M34 = Settings.Position.m11,
             };
 
             //pitch ile roll ters olabilir
@@ -160,8 +161,8 @@ namespace EDVRHUD
             var overlayError = OpenVR.Overlay.CreateOverlay("OVRHUD_" + Name.ToLowerInvariant().Replace(" ", "_"), Name, ref OverlayHandle);
             overlayError = OpenVR.Overlay.SetOverlayFlag(OverlayHandle, VROverlayFlags.VisibleInDashboard, true);
             overlayError = OpenVR.Overlay.SetOverlayFlag(OverlayHandle, VROverlayFlags.NoDashboardTab, true);
-            overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref _overlayPosition);
-            overlayError = OpenVR.Overlay.SetOverlayWidthInMeters(OverlayHandle, PanelSize.Width / 1000f);
+            overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
+            overlayError = OpenVR.Overlay.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale) ;
             ShowPanel(true);
 #endif //UseOpenVR
 
@@ -206,11 +207,11 @@ namespace EDVRHUD
             switch (settings.Type)
             {
                 case HudType.JumpInfo:
-                    return new JumpInfoPanel(new Size(settings.Width, settings.Height), ref settings.Position);
+                    return new JumpInfoPanel(settings); // new Size(settings.Width, settings.Height), ref settings.Position);
                 case HudType.ScanInfo:
-                    return new ScanInfoPanel(new Size(settings.Width, settings.Height), ref settings.Position);
+                    return new ScanInfoPanel(settings); // new Size(settings.Width, settings.Height), ref settings.Position);
                 case HudType.Warning:
-                    return new WarningPanel(new Size(settings.Width, settings.Height), ref settings.Position);
+                    return new WarningPanel(settings); // new Size(settings.Width, settings.Height), ref settings.Position);
                 default:
                     return null;
             }
@@ -262,10 +263,18 @@ namespace EDVRHUD
         {
             Debug.WriteLine("End modify panel " + Name);
             PanelUpdated = 2;
-            ShowPanel(false);                
         }
 
-        public void ModifyOverlay(int dx, int dy)
+        public void ModifyOverlayScale(int dx)
+        {
+            if (dx == 0) return;            
+            Settings.Scale += dx / 1000f;
+            if (Settings.Scale < 0.01f) Settings.Scale = 0.01f;
+            else if (Settings.Scale > 10f) Settings.Scale = 10f;
+            var overlayError = OpenVR.Overlay.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale);
+        }
+
+        public void ModifyOverlayTranslation(int dx, int dy)
         {
             if (dx == 0 && dy == 0) return;
             Debug.WriteLine("Modifiying panel " + Name + " " +  dx + "," + dy);
@@ -273,31 +282,31 @@ namespace EDVRHUD
             if (Native.IsKeyDown(Keys.LControlKey))
             {
                 //Z pos
-                _overlayPosition.m11 += dy / 1000f;
+                Settings.Position.m11 += dy / 1000f;
             }
             else if (Native.IsKeyDown(Keys.LShiftKey))
             {
                 //X and Y pos
-                _overlayPosition.m7 -= dy / 1000f;
-                _overlayPosition.m3 += dx / 1000f;
+                Settings.Position.m7 -= dy / 1000f;
+                Settings.Position.m3 += dx / 1000f;
             }
-            else if (Native.IsKeyDown(Keys.LControlKey))
+            else if (Native.IsKeyDown(Keys.RControlKey))
             {
                 //Z rot
                 roll += dx / 1000.0;
                 var q = Quaternion.CreateFromYawPitchRoll(yaw, pitch, roll);
                 var m = q.ToMatrix();
-                _overlayPosition.m0 = (float)m.M11;
-                _overlayPosition.m1 = (float)m.M12;
-                _overlayPosition.m2 = (float)m.M13;
+                Settings.Position.m0 = (float)m.M11;
+                Settings.Position.m1 = (float)m.M12;
+                Settings.Position.m2 = (float)m.M13;
 
-                _overlayPosition.m4 = (float)m.M21;
-                _overlayPosition.m5 = (float)m.M22;
-                _overlayPosition.m6 = (float)m.M23;
+                Settings.Position.m4 = (float)m.M21;
+                Settings.Position.m5 = (float)m.M22;
+                Settings.Position.m6 = (float)m.M23;
 
-                _overlayPosition.m8 = (float)m.M31;
-                _overlayPosition.m9 = (float)m.M32;
-                _overlayPosition.m10 = (float)m.M33;
+                Settings.Position.m8 = (float)m.M31;
+                Settings.Position.m9 = (float)m.M32;
+                Settings.Position.m10 = (float)m.M33;
             }
             else if (Native.IsKeyDown(Keys.RShiftKey))
             {
@@ -306,17 +315,17 @@ namespace EDVRHUD
                 pitch += dy / 1000.0;
                 var q = Quaternion.CreateFromYawPitchRoll(yaw, pitch, roll);
                 var m = q.ToMatrix();
-                _overlayPosition.m0 = (float)m.M11;
-                _overlayPosition.m1 = (float)m.M12;
-                _overlayPosition.m2 = (float)m.M13;
+                Settings.Position.m0 = (float)m.M11;
+                Settings.Position.m1 = (float)m.M12;
+                Settings.Position.m2 = (float)m.M13;
 
-                _overlayPosition.m4 = (float)m.M21;
-                _overlayPosition.m5 = (float)m.M22;
-                _overlayPosition.m6 = (float)m.M23;
+                Settings.Position.m4 = (float)m.M21;
+                Settings.Position.m5 = (float)m.M22;
+                Settings.Position.m6 = (float)m.M23;
 
-                _overlayPosition.m8 = (float)m.M31;
-                _overlayPosition.m9 = (float)m.M32;
-                _overlayPosition.m10 = (float)m.M33;
+                Settings.Position.m8 = (float)m.M31;
+                Settings.Position.m9 = (float)m.M32;
+                Settings.Position.m10 = (float)m.M33;
             }
                         
             PanelUpdated = 2;            
@@ -387,8 +396,11 @@ namespace EDVRHUD
                     if (!frm.Modifying)
                         return;
                     var initialPos = frm.InitialMousePos;
-                    var mousePos = Cursor.Position;                    
-                    frm.Panel.ModifyOverlay(mousePos.X - initialPos.X, mousePos.Y - initialPos.Y);
+                    var mousePos = Cursor.Position;          
+                    if (args.Button == MouseButtons.Left)
+                        frm.Panel.ModifyOverlayTranslation(mousePos.X - initialPos.X, mousePos.Y - initialPos.Y);
+                    else if (args.Button == MouseButtons.Right)
+                        frm.Panel.ModifyOverlayScale(mousePos.X - initialPos.X);
                     Cursor.Position = frm.InitialMousePos;
                 };
             }
@@ -398,24 +410,29 @@ namespace EDVRHUD
 
         internal void ShowPanel(bool show)
         {
+            if (PanelVisible != show)
+            {
 #if UseOpenVR
-            var overlayError =
-                show ?
-                OpenVR.Overlay.ShowOverlay(OverlayHandle) :
-                OpenVR.Overlay.HideOverlay(OverlayHandle);
+                var overlayError =
+                    show ?
+                    OpenVR.Overlay.ShowOverlay(OverlayHandle) :
+                    OpenVR.Overlay.HideOverlay(OverlayHandle);
 #endif //#if UseOpenVR
-            PanelVisible = show;
+                PanelVisible = show;
+                //Debug.WriteLine("Panel " + Name + " visibility set to " + show);
+            }
+            
         }
         
         internal void SendOverlay()
         {
 #if UseOpenVR
-            var overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref _overlayPosition);
+            var overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
             overlayError = OpenVR.Overlay.SetOverlayTexture(OverlayHandle, ref OVRTexture);
 #endif //UseOpenVR
         }
 
-        public int PanelUpdated { get; protected set; } = 0;
+        public int PanelUpdated { get; set; } = 0;
 
         public abstract void JournalUpdate(string eventType, Dictionary<string, object> entry);
 
@@ -424,6 +441,11 @@ namespace EDVRHUD
         internal void RefreshUpdate()
         {
             PanelUpdated = 2;
+        }
+
+        internal virtual void GUIFocusChanged(int guiFocus)
+        {
+            
         }
     }
 }

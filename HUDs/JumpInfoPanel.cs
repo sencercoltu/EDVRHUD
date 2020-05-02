@@ -4,14 +4,29 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Globalization;
+using System.Linq;
 using Valve.VR;
 
 namespace EDVRHUD.HUDs
 {
     internal class JumpInfoPanel : HudPanel
     {
-        public JumpInfoPanel(Size size, ref HmdMatrix34_t position) : base(HudType.JumpInfo, "JumpInfo", size, position)
-        {            
+        //public JumpInfoPanel(Size size, ref HmdMatrix34_t position) : base(HudType.JumpInfo, "JumpInfo", size, position)
+        //{            
+        //}
+
+        public JumpInfoPanel(PanelSettings settings) : base("JumpInfo", settings)
+        {
+        }
+
+        private int[] VisibleGuiFocus = new[] { 0, 1, 2, 3, 4 };
+
+        internal override void GUIFocusChanged(int guiFocus)
+        {
+            if (VisibleGuiFocus.Contains(guiFocus))
+                ShowPanel(true);
+            else
+                ShowPanel(false);
         }
 
         private string TargetStarType = "";
