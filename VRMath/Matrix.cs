@@ -618,8 +618,8 @@ namespace EDVRHUD
             else
             {
                 yaw = Math.Atan2(-m.M31, m.M11);
-                pitch = Math.Asin(m.M21);
-                roll = Math.Atan2(-m.M23, m.M22);
+                roll = Math.Asin(m.M21);
+                pitch = Math.Atan2(-m.M23, m.M22);
             }
         }
 
