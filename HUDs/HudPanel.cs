@@ -28,7 +28,10 @@ namespace EDVRHUD
         public int Width;
         public int Height;
         public float Scale;
-        public HmdMatrix34_t Position;        
+        public float UnfocusScale;
+        public float Alpha;
+        public float UnfocusAlpha;
+        public HmdMatrix34_t Position;
     }
 
     public class PanelSaveData
@@ -49,10 +52,8 @@ namespace EDVRHUD
                 {
                     if (OverlayHandle != 0)
                     {
-#if UseOpenVR
-                        OpenVR.Overlay.ClearOverlayTexture(OverlayHandle);
-                        OpenVR.Overlay.DestroyOverlay(OverlayHandle);
-#endif //UseOpenVR
+                        OpenVR.Overlay?.ClearOverlayTexture(OverlayHandle);
+                        OpenVR.Overlay?.DestroyOverlay(OverlayHandle);
                         OverlayHandle = 0;
                     }
 
@@ -149,7 +150,7 @@ namespace EDVRHUD
 
         private bool _initialized = false;
 
-        private bool PanelVisible { get; set; }
+        private bool PanelVisible { get; set; } = false;
 
         public virtual void Initialize()
         {
@@ -157,14 +158,16 @@ namespace EDVRHUD
                 return;
 
             var hDesktopDC = Native.GetDC(Native.GetDesktopWindow());
-#if UseOpenVR
-            var overlayError = OpenVR.Overlay.CreateOverlay("OVRHUD_" + Name.ToLowerInvariant().Replace(" ", "_"), Name, ref OverlayHandle);
-            overlayError = OpenVR.Overlay.SetOverlayFlag(OverlayHandle, VROverlayFlags.VisibleInDashboard, true);
-            overlayError = OpenVR.Overlay.SetOverlayFlag(OverlayHandle, VROverlayFlags.NoDashboardTab, true);
-            overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
-            overlayError = OpenVR.Overlay.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale) ;
+
+            if (NotificationApp.Settings.UseOpenVR)
+            {
+                var overlayError = OpenVR.Overlay?.CreateOverlay("OVRHUD_" + Name.ToLowerInvariant().Replace(" ", "_"), Name, ref OverlayHandle);
+                overlayError = OpenVR.Overlay?.SetOverlayFlag(OverlayHandle, VROverlayFlags.VisibleInDashboard, true);
+                overlayError = OpenVR.Overlay?.SetOverlayFlag(OverlayHandle, VROverlayFlags.NoDashboardTab, true);
+                overlayError = OpenVR.Overlay?.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
+                overlayError = OpenVR.Overlay?.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale);
+            }
             ShowPanel(true);
-#endif //UseOpenVR
 
             var texture2dDescription = new Texture2DDescription
             {
@@ -244,7 +247,7 @@ namespace EDVRHUD
             IntermediateBitmap.UnlockBits(data);
 
             TextureDataBox[0].DataPointer = OffScreenPtr;
-            TextureDataBox[0].RowPitch = data.Stride;            
+            TextureDataBox[0].RowPitch = data.Stride;
             NotificationApp.D3DDeviceContext.UpdateSubresource(TextureDataBox[0], RenderTexture);
             NotificationApp.D3DDeviceContext.Flush();
         }
@@ -267,7 +270,7 @@ namespace EDVRHUD
 
         public void ModifyOverlayScale(int dx)
         {
-            if (dx == 0) return;            
+            if (dx == 0) return;
             Settings.Scale += dx / 1000f;
             if (Settings.Scale < 0.01f) Settings.Scale = 0.01f;
             else if (Settings.Scale > 10f) Settings.Scale = 10f;
@@ -277,7 +280,7 @@ namespace EDVRHUD
         public void ModifyOverlayTranslation(int dx, int dy)
         {
             if (dx == 0 && dy == 0) return;
-            Debug.WriteLine("Modifiying panel " + Name + " " +  dx + "," + dy);
+            Debug.WriteLine("Modifiying panel " + Name + " " + dx + "," + dy);
 
             if (Native.IsKeyDown(Keys.LControlKey))
             {
@@ -327,8 +330,8 @@ namespace EDVRHUD
                 Settings.Position.m9 = (float)m.M32;
                 Settings.Position.m10 = (float)m.M33;
             }
-                        
-            PanelUpdated = 2;            
+
+            PanelUpdated = 2;
         }
 
         public class DoubleBufferForm : Form
@@ -358,7 +361,7 @@ namespace EDVRHUD
                 };
 
                 HudPreview.FormClosing += (sender, args) =>
-                {                    
+                {
                     HudPreview = null;
                 };
 
@@ -367,11 +370,6 @@ namespace EDVRHUD
                     args.Graphics.Clear(NotificationApp.DefaultClearColor);
                     args.Graphics.DrawImage(IntermediateBitmap, HudPreview.ClientRectangle);
                     args.Graphics.Flush();
-                };
-
-                HudPreview.KeyPress += (sender, args) =>
-                {                    
-                    NotificationApp.ReplayNextSystem = true;
                 };
 
                 HudPreview.MouseDown += (sender, args) =>
@@ -383,7 +381,7 @@ namespace EDVRHUD
                 };
 
                 HudPreview.MouseUp += (sender, args) =>
-                {                    
+                {
                     var frm = (sender as DoubleBufferForm);
                     frm.InitialMousePos = Cursor.Position;
                     EndModifyOverlay();
@@ -396,7 +394,7 @@ namespace EDVRHUD
                     if (!frm.Modifying)
                         return;
                     var initialPos = frm.InitialMousePos;
-                    var mousePos = Cursor.Position;          
+                    var mousePos = Cursor.Position;
                     if (args.Button == MouseButtons.Left)
                         frm.Panel.ModifyOverlayTranslation(mousePos.X - initialPos.X, mousePos.Y - initialPos.Y);
                     else if (args.Button == MouseButtons.Right)
@@ -412,24 +410,66 @@ namespace EDVRHUD
         {
             if (PanelVisible != show)
             {
-#if UseOpenVR
-                var overlayError =
-                    show ?
-                    OpenVR.Overlay.ShowOverlay(OverlayHandle) :
-                    OpenVR.Overlay.HideOverlay(OverlayHandle);
-#endif //#if UseOpenVR
+                if (NotificationApp.Settings.UseOpenVR)
+                {
+                    if (PanelVisible)
+                    {
+                        var overlayError = OpenVR.Overlay?.HideOverlay(OverlayHandle);
+                    }
+                    else
+                    {
+                        var overlayError = OpenVR.Overlay?.ShowOverlay(OverlayHandle);
+                        PanelUpdated = 2;
+                    }
+                }
                 PanelVisible = show;
                 //Debug.WriteLine("Panel " + Name + " visibility set to " + show);
             }
-            
         }
-        
+
+        private VROverlayIntersectionResults_t IntersectionResult = new VROverlayIntersectionResults_t();
+
+        private float CurrentAlpha;
+
+        internal bool LookAt(ref VROverlayIntersectionParams_t intersectionParams)
+        {
+            if (Settings.Alpha == Settings.UnfocusAlpha)
+                return false;
+
+            if (NotificationApp.Settings.UseOpenVR)
+            {
+                if (OpenVR.Overlay.ComputeOverlayIntersection(OverlayHandle, ref intersectionParams, ref IntersectionResult))
+                {
+                    if (CurrentAlpha != Settings.Alpha)
+                    {
+                        CurrentAlpha += 0.005f;
+                        if (CurrentAlpha > Settings.Alpha) CurrentAlpha = Settings.Alpha;
+                        OpenVR.Overlay.SetOverlayAlpha(OverlayHandle, CurrentAlpha);
+                        return true;
+                    }
+                    Debug.WriteLine(Name + " intersect.");
+                }
+                else
+                {
+                    if (CurrentAlpha != Settings.UnfocusAlpha)
+                    {
+                        CurrentAlpha -= 0.005f;
+                        if (CurrentAlpha < Settings.UnfocusAlpha) CurrentAlpha = Settings.UnfocusAlpha;
+                        OpenVR.Overlay.SetOverlayAlpha(OverlayHandle, CurrentAlpha);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         internal void SendOverlay()
         {
-#if UseOpenVR
-            var overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
-            overlayError = OpenVR.Overlay.SetOverlayTexture(OverlayHandle, ref OVRTexture);
-#endif //UseOpenVR
+            if (NotificationApp.Settings.UseOpenVR)
+            {
+                var overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
+                overlayError = OpenVR.Overlay.SetOverlayTexture(OverlayHandle, ref OVRTexture);
+            }
         }
 
         public int PanelUpdated { get; set; } = 0;
@@ -443,9 +483,9 @@ namespace EDVRHUD
             PanelUpdated = 2;
         }
 
-        internal virtual void GUIFocusChanged(int guiFocus)
+        internal virtual void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
         {
-            
+
         }
     }
 }

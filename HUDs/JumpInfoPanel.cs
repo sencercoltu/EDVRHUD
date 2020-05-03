@@ -19,11 +19,11 @@ namespace EDVRHUD.HUDs
         {
         }
 
-        private int[] VisibleGuiFocus = new[] { 0, 1, 2, 3, 4 };
+        private GUIFocus[] VisibleGuiFocus = new[] { GUIFocus.None, GUIFocus.InternalPanel, GUIFocus.ExternalPanel, GUIFocus.CommsPanel, GUIFocus.RolePanel };        
 
-        internal override void GUIFocusChanged(int guiFocus)
+        internal override void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
         {
-            if (VisibleGuiFocus.Contains(guiFocus))
+            if (VisibleGuiFocus.Contains(guiFocus) && status.HasFlag(StatusFlags.InMainShip))
                 ShowPanel(true);
             else
                 ShowPanel(false);
@@ -32,7 +32,8 @@ namespace EDVRHUD.HUDs
         private string TargetStarType = "";
         private string TargetStarSystem = "";
         private int RemainingJumps = 0;
-        private double JetConeBoost = 1;        
+        private double JetConeBoost = 1;
+        private bool ActiveRoute = false;
         public override void JournalUpdate(string eventType, Dictionary<string, object> eventData)
         {
             switch (eventType)
@@ -55,6 +56,7 @@ namespace EDVRHUD.HUDs
                             if (EDCommon.StarLookup.TryGetValue(eventData.GetProperty("StarClass", "Unknown"), out var star))
                                 TargetStarType = star.TypeName;
                             TargetStarSystem = eventData.GetProperty("StarSystem", "Unknown");
+                            if (RemainingJumps > 0) RemainingJumps--;
                             Redraw();
                         }
                     }
@@ -63,6 +65,8 @@ namespace EDVRHUD.HUDs
                     //started jumping
                     {
                         RemainingJumps = eventData.GetProperty("RemainingJumpsInRoute", 0);
+                        if (RemainingJumps > 0)
+                            ActiveRoute = true;
                         Redraw();
                     }
                     break;
@@ -70,10 +74,16 @@ namespace EDVRHUD.HUDs
                     //end jump
                     {
                         //reset jcb
-                        if (RemainingJumps == 1) RemainingJumps = 0;
-                        NotificationApp.Shutup();                        
+                        //if (RemainingJumps == 1) RemainingJumps = 0;
+                        NotificationApp.Shutup();                                     
                         JetConeBoost = 1;
-                        Redraw();                        
+                        Redraw();
+                        if (RemainingJumps == 0 && ActiveRoute)
+                        {
+                            ActiveRoute = false;
+                            NotificationApp.Talk("Reached destination " + TargetStarSystem);
+                        }
+
                     }
                     break;
             }
@@ -81,8 +91,8 @@ namespace EDVRHUD.HUDs
 
         private Brush BackgroundBrush = new SolidBrush(Color.FromArgb(5, 0, 0, 0));
 
-        private Pen TopLinePen = new Pen(Color.FromArgb(255, 171, 80, 6), 2f);
-        private Pen BottomLinePen = new Pen(Color.FromArgb(255, 194, 102, 7), 2f);
+        private Pen TopLinePen = new Pen(Color.FromArgb(255, 171, 80, 6), 3f);
+        private Pen BottomLinePen = new Pen(Color.FromArgb(255, 194, 102, 7), 3f);
 
         private int IconSize = 40;
         protected override void Redraw()
@@ -97,7 +107,7 @@ namespace EDVRHUD.HUDs
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
                 g.DrawLine(TopLinePen, 0, 1, TextureSize.Width, 1);
-                g.DrawLine(BottomLinePen, 0, TextureSize.Height - 1, TextureSize.Width, TextureSize.Height - 1);
+                g.DrawLine(BottomLinePen, 0, TextureSize.Height - 2, TextureSize.Width, TextureSize.Height - 2);
 
                 var x = 0;
                 var y = 3;
@@ -114,7 +124,7 @@ namespace EDVRHUD.HUDs
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, x, y + 4);
                 x += w;
 
-                g.DrawImage(Properties.Resources.JetBoost, x, y, IconSize, IconSize);
+                g.DrawImage(JetConeBoost > 1? Properties.Resources.JetBoosted : Properties.Resources.JetBoost, x, y, IconSize, IconSize);
                 x += IconSize;
                 str = " " + JetConeBoost.ToString("N1", CultureInfo.InvariantCulture);
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, x, y + 4);

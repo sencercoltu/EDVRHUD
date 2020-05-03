@@ -63,16 +63,6 @@ namespace EDVRHUD.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static System.Drawing.Bitmap AmmoniaWorld {
-            get {
-                object obj = ResourceManager.GetObject("AmmoniaWorld", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Drawing.Bitmap.
-        /// </summary>
         internal static System.Drawing.Bitmap Credit {
             get {
                 object obj = ResourceManager.GetObject("Credit", resourceCulture);
@@ -91,12 +81,32 @@ namespace EDVRHUD.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap EarthLike {
+            get {
+                object obj = ResourceManager.GetObject("EarthLike", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
         internal static byte[] EUROCAPS {
             get {
                 object obj = ResourceManager.GetObject("EUROCAPS", resourceCulture);
                 return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap GasGiant {
+            get {
+                object obj = ResourceManager.GetObject("GasGiant", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
             }
         }
         
@@ -116,6 +126,16 @@ namespace EDVRHUD.Properties {
         internal static System.Drawing.Bitmap JetBoost {
             get {
                 object obj = ResourceManager.GetObject("JetBoost", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap JetBoosted {
+            get {
+                object obj = ResourceManager.GetObject("JetBoosted", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -173,9 +193,9 @@ namespace EDVRHUD.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static System.Drawing.Bitmap RingedPlanet {
+        internal static System.Drawing.Bitmap Ring {
             get {
-                object obj = ResourceManager.GetObject("RingedPlanet", resourceCulture);
+                object obj = ResourceManager.GetObject("Ring", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -243,6 +263,16 @@ namespace EDVRHUD.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap SignalAvail {
+            get {
+                object obj = ResourceManager.GetObject("SignalAvail", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Skull {
             get {
                 object obj = ResourceManager.GetObject("Skull", resourceCulture);
@@ -256,16 +286,6 @@ namespace EDVRHUD.Properties {
         internal static System.Drawing.Bitmap Star {
             get {
                 object obj = ResourceManager.GetObject("Star", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Drawing.Bitmap.
-        /// </summary>
-        internal static System.Drawing.Bitmap WaterWorld {
-            get {
-                object obj = ResourceManager.GetObject("WaterWorld", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

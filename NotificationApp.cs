@@ -27,8 +27,7 @@ namespace EDVRHUD
             public string Voice { get; set; } = "";
             public int VoiceRate { get; set; } = 4; //-10 to 10
             public int VoiceVolume { get; set; } = 100; //0 to 100
-            public int JournalReplaySpeed { get; set; } = 10;
-            public bool BreakOnFSDJump { get; set; } = true;
+            public bool UseOpenVR { get; set; } = true;
         }
 
         public static bool InitialLoad = false;
@@ -65,25 +64,26 @@ namespace EDVRHUD
         public static DeviceContext D3DDeviceContext { get; set; }
         public static SharpDX.Direct3D11.Device D3DDevice { get; set; }
 
-        private List<HudPanel> HudPanels { get; } = new List<HudPanel>();
+        private static List<HudPanel> HudPanels { get; } = new List<HudPanel>();
 
-        private MenuItem PanelsMenu;
+        private static MenuItem PanelsMenu;
         private MenuItem SettingsMenu;
-        private MenuItem ReplayMenu;
+        public static MenuItem ReplayMenu;
 
-        private string EDJournalPath;
-        private FileSystemWatcher EDLogWatcher;
+        public static string EDJournalPath { get; private set; }
+        private static FileSystemWatcher EDLogWatcher;
         private FileSystemWatcher EDStatusWatcher;
-        private Thread EDJournalReplayThread;
-        public static bool ReplayNextSystem = false;
+        //private Thread EDJournalReplayThread;
+        //public static bool ReplayNextSystem = false;
 
+        private static Form ReplayForm = null;
 
         public NotificationApp()
         {
             PanelsMenu = new MenuItem("Panels");
             SettingsMenu = new MenuItem("Settings...");
             SettingsMenu.Click += SettingsMenu_Click;
-            ReplayMenu = new MenuItem("Replay Journal...");
+            ReplayMenu = new MenuItem("Journal Replay...");
             ReplayMenu.Click += ReplayMenu_Click;
 
             TrayIcon = new NotifyIcon()
@@ -110,76 +110,49 @@ namespace EDVRHUD
 
         private void ReplayMenu_Click(object sender, EventArgs e)
         {
-            //select file
-            string[] filenames = new string[0];
-            using (var ofd = new OpenFileDialog())
+            if (ReplayForm == null)
             {
-                ofd.Multiselect = true;
-                ofd.InitialDirectory = EDJournalPath;
-                ofd.Filter = "Elite Dangerous Journal|Journal.????????????.??.log";
-                ofd.Title = "Please select one or more journals to replay";
-                ofd.DefaultExt = ".log";
-                if (ofd.ShowDialog() == DialogResult.OK)
+                Talk("Stopping journal listening.", false);
+                StopJournalListening();
+                ReplayMenu.Enabled = false;
+                ReplayForm = new ReplayControlForm();
+                ReplayForm.Icon = Properties.Resources.Icon;
+                ReplayForm.FormClosed += (s, a) =>
                 {
-                    filenames = ofd.FileNames.OrderBy(f => f).ToArray();
-                }
-            }
-
-            if (filenames.Length == 0)
-                return;
-
-            EDLogWatcher.EnableRaisingEvents = false;
-            ReplayMenu.Enabled = false;
-
-            EDJournalReplayThread = new Thread(() =>
-            {
-                //var usedEvents = new[] { "StarClass", "JetConeBoost", "StartJump", "FSDTarget", "FSDJump", "DiscoveryScan", "FSSSignalDiscovered", "FSSDiscoveryScan", "FSSAllBodiesFound", "Scan" };
-
-                lock (ContentLock)
-                    CachedContent = "";
-                LastJournalTimeStamp = DateTime.MinValue;
-
-                foreach (var filename in filenames)
-                {
-                    if (!AppRunning)
-                        return;
-                    var content = File.ReadAllText(filename);
-                    var lines = content.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                    foreach (var line in lines)
+                    if (AppRunning)
                     {
-                        if (string.IsNullOrEmpty(line))
-                            continue;
-
-                        //if (!usedEvents.Any(e => line.Contains("\"" + e + "\"")))
-                        //    continue;
-                        if (Settings.BreakOnFSDJump)
-                        {
-                            if (line.Contains("\"event\":\"FSDJump\","))
-                            {
-                                while (true)
-                                {
-                                    if (!AppRunning)
-                                        return;
-                                    if (ReplayNextSystem)
-                                    {
-                                        ReplayNextSystem = false;
-                                        break;
-                                    }
-                                    Thread.Sleep(100);
-                                }
-                            }
-                        }
-                        lock (ContentLock)
-                            CachedContent += line + Environment.NewLine;
-                        if (!AppRunning)
-                            break;
-
-                        Thread.Sleep((100 - Settings.JournalReplaySpeed + 1) * 10);
+                        Talk("Resuming journal listening.", false);
+                        LoadPanels(null, null);
+                        ReplayMenu.Enabled = true;
+                        StartJournalListening();
                     }
-                }
-            })
-            { IsBackground = true };
-            EDJournalReplayThread.Start();
+                };
+            }
+            LoadPanels(null, null);
+            ReplayForm.Show();
+            ReplayForm.Focus();
+
+            ////select file
+            //string[] filenames = new string[0];
+            //using (var ofd = new OpenFileDialog())
+            //{
+            //    ofd.Multiselect = true;
+            //    ofd.InitialDirectory = EDJournalPath;
+            //    ofd.Filter = "Elite Dangerous Journal|Journal.????????????.??.log";
+            //    ofd.Title = "Please select one or more journals to replay";
+            //    ofd.DefaultExt = ".log";
+            //    if (ofd.ShowDialog() == DialogResult.OK)
+            //    {
+            //        filenames = ofd.FileNames.OrderBy(f => f).ToArray();
+            //    }
+            //}
+
+            //if (filenames.Length == 0)
+            //    return;
+
+            //EDLogWatcher.EnableRaisingEvents = false;
+            //ReplayMenu.Enabled = false;
+
         }
 
         public static SettingsForm SettingsForm { get; set; } = null;
@@ -237,11 +210,9 @@ namespace EDVRHUD
             Speech.SelectVoice(Settings.Voice);
             Speech.Rate = Settings.VoiceRate;
             Speech.Volume = Settings.VoiceVolume;
-            if (!Settings.BreakOnFSDJump)
-                ReplayNextSystem = true;
         }
 
-        private string CommanderName { get; set; }
+        private static string CommanderName { get; set; }
 
         private void SavePanels(object sender, EventArgs e)
         {
@@ -259,7 +230,7 @@ namespace EDVRHUD
             File.WriteAllText(path, s);
         }
 
-        private void LoadPanels(object sender, EventArgs e)
+        private static void LoadPanels(object sender, EventArgs e)
         {
             foreach (var panel in HudPanels)
             {
@@ -283,7 +254,7 @@ namespace EDVRHUD
             }
         }
 
-        private void OnShowPanel(object sender, EventArgs e)
+        private static void OnShowPanel(object sender, EventArgs e)
         {
             var panel = (sender as MenuItem).Tag as HudPanel;
             panel.ShowPreview();
@@ -314,7 +285,12 @@ namespace EDVRHUD
 
         public void Run()
         {
+            EDJournalPath = GetSavedGamesPath() + "\\Frontier Developments\\Elite Dangerous";
             LoadSettings();
+            GetCommander();
+            if (Settings.VoiceEnable)
+                Speech.Speak("Welcome Commander " + CommanderName + ".");
+
             using (var fontCollection = new PrivateFontCollection())
             {
                 unsafe
@@ -330,27 +306,30 @@ namespace EDVRHUD
                 using (EDFont = new Font(family, 20))
                 {
                     int adapterIndex = 0;
-
-#if UseOpenVR
-                    var refreshRate = 90;
-                    var err = EVRInitError.None;
-
-                    var vrSystem = OpenVR.Init(ref err, EVRApplicationType.VRApplication_Overlay);
-                    if (err != EVRInitError.None || OpenVR.Compositor == null || OpenVR.Overlay == null)
-                    {
-                        AppRunning = false;
-                        return;
-                    }
-
-                    var terr = ETrackedPropertyError.TrackedProp_Success;
-                    refreshRate = (int)OpenVR.System.GetFloatTrackedDeviceProperty(0, ETrackedDeviceProperty.Prop_DisplayFrequency_Float, ref terr);
-
-                    OpenVR.System.GetDXGIOutputInfo(ref adapterIndex);
-
                     var vrEvent = new VREvent_t();
                     var vrEventSize = (uint)Marshal.SizeOf(vrEvent);
+                    var refreshRate = 90;
+                    var err = EVRInitError.None;
+                    CVRSystem vrSystem = null;
+                    var poseArray = new TrackedDevicePose_t[1] { new TrackedDevicePose_t() }; //hmd only
+                    var intersectionParams = new VROverlayIntersectionParams_t();
+                    intersectionParams.eOrigin = ETrackingUniverseOrigin.TrackingUniverseSeated;
 
-#endif //UseOpenVR
+                    if (Settings.UseOpenVR)
+                    {
+                        vrSystem = OpenVR.Init(ref err, EVRApplicationType.VRApplication_Overlay);
+                        if (err != EVRInitError.None || OpenVR.Compositor == null || OpenVR.Overlay == null)
+                        {
+                            AppRunning = false;
+                            return;
+                        }
+
+                        var terr = ETrackedPropertyError.TrackedProp_Success;
+                        refreshRate = (int)OpenVR.System.GetFloatTrackedDeviceProperty(0, ETrackedDeviceProperty.Prop_DisplayFrequency_Float, ref terr);
+
+                        OpenVR.System.GetDXGIOutputInfo(ref adapterIndex);
+                    }
+
                     using (var factory = new Factory4())
                     {
                         var adapter = factory.GetAdapter(adapterIndex);
@@ -359,8 +338,6 @@ namespace EDVRHUD
 
                         LoadPanels(null, null);
 
-                        EDJournalPath = GetSavedGamesPath() + "\\Frontier Developments\\Elite Dangerous";
-
                         EDStatusWatcher = new FileSystemWatcher(EDJournalPath, "Status.json")
                         {
                             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
@@ -368,111 +345,63 @@ namespace EDVRHUD
                         EDStatusWatcher.Changed += StatusChanged;
                         EDStatusWatcher.Created += StatusChanged;
                         EDStatusWatcher.EnableRaisingEvents = true;
+                        ReadStatus();
 
-                        EDLogWatcher = new FileSystemWatcher(EDJournalPath, "Journal.????????????.??.log")
-                        {
-                            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
-                        };
-                        EDLogWatcher.Changed += JournalChanged;
-                        EDLogWatcher.Created += JournalChanged;
-
-                        InitialLoad = true;
-
-                        //load last FSDJump 
-                        var skippedFiles = new List<string>();
-                        var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
-                        var jumpFound = false;
-
-                        while (true)
-                        {
-                            LastJournalFile = files[0];
-                            files.RemoveAt(0);
-
-                            LastJournalPosition = 0;
-                            ReadJournal();
-                            lock (ContentLock)
-                            {
-                                var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                                CachedContent = "";
-                                for (var i = lines.Length; i > 0; i--)
-                                {
-                                    var line = lines[i - 1];
-                                    if (string.IsNullOrEmpty(line))
-                                        continue;
-                                    if (!line.Contains("\"event\":\"Shutdown\"")) //skip shutdowns
-                                        CachedContent = line + Environment.NewLine + CachedContent;
-                                    if (line.Contains("\"event\":\"StartJump\", \"JumpType\":\"Hyperspace\""))
-                                    {
-                                        jumpFound = true;
-                                        break;
-                                    }
-                                }
-
-                                if (jumpFound)
-                                {
-                                    //get name
-                                    for (var i = 0; i < lines.Length; i++)
-                                    {
-                                        var json = Serializer.Deserialize<Dictionary<string, object>>(lines[i]);
-                                        if (json.GetProperty("event", "") == "Commander")
-                                        {
-                                            CommanderName = json.GetProperty("Name", "Unknown");
-                                            break;
-                                        }
-                                    }
-
-                                }
-
-                            }
-                            if (jumpFound)
-                            {
-                                if (skippedFiles.Count > 0)
-                                {
-                                    files = skippedFiles;
-                                }
-                                else
-                                    break;
-                            }
-                            else
-                            {
-                                lock (ContentLock)
-                                    CachedContent = "";
-                                skippedFiles.Add(LastJournalFile);
-                            }
-                        }
-
-                        var HudIsHidden = false;
-
-                        var HideEvents = new[] { "Shutdown", "LaunchSRV" };
-                        var ShowEvents = new[] { "DockSRV" };
-
-                        if (Settings.VoiceEnable)
-                            Speech.Speak("Welcome Commander " + CommanderName + ".");
+                        StartJournalListening();
 
                         while (AppRunning)
                         {
                             if (InitialLoad)
                             {
-                                lock(ContentLock)
+                                lock (ContentLock)
                                 {
                                     if (string.IsNullOrEmpty(CachedContent))
-                                    {
                                         InitialLoad = false;
-                                        EDLogWatcher.EnableRaisingEvents = true;
+                                }
+                            }
+
+                            bool intersect = false;
+                            if (vrSystem != null)
+                            {
+                                while (vrSystem.PollNextEvent(ref vrEvent, vrEventSize))
+                                {
+                                    if (vrEvent.eventType == (int)EVREventType.VREvent_Quit)
+                                    {
+                                        AppRunning = false;
+                                        TrayIcon.Visible = false;
+                                        continue;
                                     }
                                 }
+
+                                //need to find a better way to calculate intersection parameters
+                                vrSystem.GetDeviceToAbsoluteTrackingPose(ETrackingUniverseOrigin.TrackingUniverseSeated, 0, poseArray);
+                                var m = new Matrix(
+                                    poseArray[0].mDeviceToAbsoluteTracking.m0, poseArray[0].mDeviceToAbsoluteTracking.m4, poseArray[0].mDeviceToAbsoluteTracking.m8, 0,
+                                    poseArray[0].mDeviceToAbsoluteTracking.m1, poseArray[0].mDeviceToAbsoluteTracking.m5, poseArray[0].mDeviceToAbsoluteTracking.m9, 0,
+                                    poseArray[0].mDeviceToAbsoluteTracking.m2, poseArray[0].mDeviceToAbsoluteTracking.m6, poseArray[0].mDeviceToAbsoluteTracking.m10, 0,
+                                    poseArray[0].mDeviceToAbsoluteTracking.m3, poseArray[0].mDeviceToAbsoluteTracking.m7, poseArray[0].mDeviceToAbsoluteTracking.m11, 1);
+                                m.Decompose(out var s, out var r, out var t);
+
+                                var dir = Vector3.Transform(t, r);
+
+                                //var u = new Vector3(r.X, r.Y, r.Z);
+                                //var sx = r.W;
+                                //var dir = 2.0f * Vector3.Dot(u, t) * u + (sx * sx - Vector3.Dot(u, u)) * t + 2.0f * s * Vector3.Cross(u, t);
+
+                                intersectionParams.vSource.v0 = (float)t.X;
+                                intersectionParams.vSource.v1 = (float)t.Y;
+                                intersectionParams.vSource.v2 = -(float)t.Z;
+
+                                intersectionParams.vDirection.v0 = (float)dir.X;
+                                intersectionParams.vDirection.v1 = (float)dir.Y;
+                                intersectionParams.vDirection.v2 = -(float)dir.Z;
+
+                                foreach (var p in HudPanels)
+                                    intersect |= p.LookAt(ref intersectionParams);
+
+
                             }
-#if UseOpenVR
-                            while (vrSystem.PollNextEvent(ref vrEvent, vrEventSize))
-                            {
-                                if (vrEvent.eventType == (int)EVREventType.VREvent_Quit)
-                                {
-                                    AppRunning = false;
-                                    TrayIcon.Visible = false;
-                                    continue;
-                                }
-                            }
-#endif //UseOpenVR
+
                             if (!string.IsNullOrEmpty(CachedContent))
                             {
                                 string[] lines;
@@ -484,7 +413,7 @@ namespace EDVRHUD
 
                                 foreach (var line in lines)
                                 {
-                                    if (!string.IsNullOrEmpty(line))
+                                    if (!string.IsNullOrWhiteSpace(line))
                                     {
                                         //System.Diagnostics.Debug.WriteLine(line);
                                         var entry = Serializer.Deserialize<Dictionary<string, object>>(line);
@@ -509,39 +438,29 @@ namespace EDVRHUD
 
                                             foreach (var p in HudPanels)
                                                 p.JournalUpdate(eventtype, entry);
-
-                                            if (ShowEvents.Contains(eventtype))
-                                            {
-                                                foreach (var p in HudPanels)
-                                                {
-                                                    p.ShowPanel(true);
-                                                    p.RefreshUpdate();
-                                                }
-                                            }
-                                            else if (HideEvents.Contains(eventtype))
-                                            {
-                                                foreach (var p in HudPanels)
-                                                    p.ShowPanel(false);
-                                            }
                                         }
                                     }
                                 }
                             }
 
                             bool anyUpdate = false;
-                            bool sendFocus = false;
+                            bool sendStatusFocus = false;
                             if (GUIFocus != PrevGUIFocus)
                             {
                                 PrevGUIFocus = GUIFocus;
-                                sendFocus = true;                                
+                                sendStatusFocus = true;
+                            }
+                            if (EDFlags != PrevEDFlags)
+                            {
+                                PrevEDFlags = EDFlags;
+                                sendStatusFocus = true;
                             }
 
                             foreach (var p in HudPanels)
                             {
-                                if (sendFocus)
+                                if (sendStatusFocus)
                                 {
-                                    p.GUIFocusChanged(GUIFocus);
-                                    p.PanelUpdated = 2;
+                                    p.EDStatusChanged(EDFlags, GUIFocus);
                                 }
                                 if (p.PanelUpdated > 0)
                                 {
@@ -550,23 +469,8 @@ namespace EDVRHUD
                                     p.SendOverlay();
                                 }
                             }
-                            if (!HudIsHidden && Native.IsKeyDown(Keys.Pause))
-                            {
-                                HudIsHidden = true;
-                                foreach (var p in HudPanels.Where(x => x is JumpInfoPanel))
-                                    p.ShowPanel(false);
-                            }
-                            else if (HudIsHidden && !Native.IsKeyDown(Keys.Pause))
-                            {
-                                HudIsHidden = false;
-                                foreach (var p in HudPanels.Where(x => x is JumpInfoPanel))
-                                {
-                                    p.ShowPanel(true);
-                                    p.RefreshUpdate();
-                                }
-                            }
 
-                            if (!anyUpdate && !sendFocus)
+                            if (!anyUpdate && !sendStatusFocus && !intersect)
                                 Thread.Sleep(100);
                             else
                                 Thread.Sleep(1);
@@ -574,28 +478,30 @@ namespace EDVRHUD
                             Application.DoEvents();
 
                         }
-                        if (EDJournalReplayThread != null && EDJournalReplayThread.IsAlive)
-                            EDJournalReplayThread.Join();
-                        EDJournalReplayThread = null;
+                        //if (EDJournalReplayThread != null && EDJournalReplayThread.IsAlive)
+                        //    EDJournalReplayThread.Join();
+                        //EDJournalReplayThread = null;
 
+                        StopJournalListening();
 
-                        EDLogWatcher.EnableRaisingEvents = false;
-                        EDLogWatcher.Dispose();
-                        EDLogWatcher = null;
+                        if (ReplayForm != null)
+                        {
+                            ReplayForm.Close();
+                            ReplayForm.Dispose();
+                            ReplayForm = null;
+                        }
 
                         EDStatusWatcher.EnableRaisingEvents = false;
                         EDStatusWatcher.Dispose();
                         EDStatusWatcher = null;
 
-                        
-
                         foreach (var p in HudPanels)
                             p.Dispose();
                         HudPanels.Clear();
                     }
-#if UseOpenVR
-                    OpenVR.Shutdown();
-#endif //UseOpenVR
+
+                    if (vrSystem != null)
+                        OpenVR.Shutdown();
                 }
 
                 EDFont.Dispose();
@@ -605,24 +511,105 @@ namespace EDVRHUD
             Speech.Dispose();
         }
 
-        private string LastJournalFile { get; set; }
-        private long LastJournalPosition { get; set; }
-        private DateTime LastJournalTimeStamp { get; set; } = DateTime.MinValue;
-        private string CachedContent { get; set; }
-        private object ContentLock = new object();
-        private int GUIFocus = 0;
-        private int PrevGUIFocus = -1;
+        private static void StopJournalListening()
+        {
+            if (EDLogWatcher != null)
+            {
+                EDLogWatcher.EnableRaisingEvents = false;
+                EDLogWatcher.Dispose();
+                EDLogWatcher = null;
+            }
+        }
+
+        private static void StartJournalListening()
+        {
+            LastJournalFile = "";
+            LastJournalPosition = 0;
+            LastJournalTimeStamp = DateTime.MinValue;
+            PrevGUIFocus = GUIFocus.Initial;
+            PrevEDFlags = StatusFlags.Initial;
+
+
+            EDLogWatcher = new FileSystemWatcher(EDJournalPath, "Journal.????????????.??.log")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
+            };
+            EDLogWatcher.Changed += JournalChanged;
+            EDLogWatcher.Created += JournalChanged;
+
+            InitialLoad = true;
+
+            //load last FSDJump 
+            var skippedFiles = new List<string>();
+            var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
+            var jumpFound = false;
+
+            while (true)
+            {
+                LastJournalFile = files[0];
+                files.RemoveAt(0);
+
+                LastJournalPosition = 0;
+                LastJournalTimeStamp = DateTime.MinValue;
+                ReadJournal();
+                lock (ContentLock)
+                {
+                    var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                    CachedContent = "";
+                    for (var i = lines.Length; i > 0; i--)
+                    {
+                        var line = lines[i - 1];
+                        if (string.IsNullOrEmpty(line))
+                            continue;
+                        CachedContent = line + Environment.NewLine + CachedContent;
+                        if (line.Contains("\"event\":\"StartJump\", \"JumpType\":\"Hyperspace\""))
+                        {
+                            jumpFound = true;
+                            break;
+                        }
+                    }
+                }
+                if (jumpFound)
+                {
+                    if (skippedFiles.Count > 0)
+                    {
+                        files = skippedFiles;
+                    }
+                    else
+                        break;
+                }
+                else
+                {
+                    lock (ContentLock)
+                        CachedContent = "";
+                    skippedFiles.Add(LastJournalFile);
+                }
+            }
+            EDLogWatcher.EnableRaisingEvents = true;
+        }
+
+        private static string LastJournalFile { get; set; }
+        private static long LastJournalPosition { get; set; }
+        public static DateTime LastJournalTimeStamp { get; set; } = DateTime.MinValue;
+        internal static string CachedContent { get; set; }
+        internal static object ContentLock = new object();
+
+        private static GUIFocus GUIFocus = GUIFocus.None;
+        private static GUIFocus PrevGUIFocus = GUIFocus.Initial;
+
+        private static StatusFlags EDFlags = StatusFlags.None;
+        private static StatusFlags PrevEDFlags = StatusFlags.Initial;
 
         private void StatusChanged(object sender, FileSystemEventArgs e)
         {
             if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
             {
                 //Debug.WriteLine("Status file changed.");
-                ReadStatus(e.FullPath);
+                ReadStatus();
             }
         }
 
-        private void JournalChanged(object sender, FileSystemEventArgs e)
+        private static void JournalChanged(object sender, FileSystemEventArgs e)
         {
             if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
             {
@@ -637,35 +624,44 @@ namespace EDVRHUD
             }
         }
 
-        private void ReadStatus(string fullPath)
+        private void ReadStatus()
         {
             try
             {
-                using (var fs = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var fs = File.Open(EDJournalPath + "\\Status.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     var bytes = new byte[fs.Length];
                     fs.Read(bytes, 0, bytes.Length);
+                    fs.Close();
                     var strcontent = Encoding.UTF8.GetString(bytes);
-                    var status = Serializer.Deserialize<Dictionary<string, object>>(strcontent);                    
-                    GUIFocus = status.GetProperty("GuiFocus", 0);
+                    if (string.IsNullOrWhiteSpace(strcontent))
+                        return;
+                    var status = Serializer.Deserialize<Dictionary<string, object>>(strcontent);
+                    GUIFocus = (GUIFocus)status.GetProperty("GuiFocus", 0);
+                    EDFlags = (StatusFlags)status.GetProperty("Flags", 0L);
+                    //if (EDFlags == StatusFlags.None)
+                    //    return;
+                    Debug.WriteLine("GUIFocus: " + GUIFocus + " ED Status: " + EDFlags.ToString());
                 }
             }
             catch
             {
 
-            }            
+            }
         }
 
-        private void ReadJournal()
+        private static void ReadJournal()
         {
             try
             {
                 using (var fs = File.Open(LastJournalFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     fs.Seek(LastJournalPosition, SeekOrigin.Begin);
-                    var bytes = new byte[fs.Length - fs.Position];
+                    var len = fs.Length;
+                    var bytes = new byte[len - fs.Position];
                     fs.Read(bytes, 0, bytes.Length);
-                    LastJournalPosition = fs.Length;
+                    fs.Close();
+                    LastJournalPosition = len;
                     var strcontent = Encoding.UTF8.GetString(bytes);
                     lock (ContentLock)
                         CachedContent += strcontent;
@@ -674,6 +670,37 @@ namespace EDVRHUD
             catch
             {
 
+            }
+        }
+
+        private static void GetCommander()
+        {
+            var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
+            if (files.Count > 0)
+            {
+                var filename = files[0];
+                string strcontent = "";
+                using (var fs = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    fs.Seek(0, SeekOrigin.Begin);
+                    var len = fs.Length;
+                    var bytes = new byte[len];
+                    fs.Read(bytes, 0, bytes.Length);
+                    fs.Close();
+                    strcontent = Encoding.UTF8.GetString(bytes);
+                }
+
+                var lines = strcontent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                //get name
+                for (var i = 0; i < lines.Length; i++)
+                {
+                    var json = Serializer.Deserialize<Dictionary<string, object>>(lines[i]);
+                    if (json.GetProperty("event", "") == "Commander")
+                    {
+                        CommanderName = json.GetProperty("Name", "Unknown");
+                        return;
+                    }
+                }
             }
         }
 

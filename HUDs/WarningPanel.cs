@@ -54,7 +54,7 @@ namespace EDVRHUD.HUDs
                             {
                                 if (EDCommon.StarLookup.TryGetValue(sc, out var star))
                                 {
-                                    if (star.Type == EDCommon.StarType.Dangerous)
+                                    if (star.Type == StarType.Dangerous)
                                     {
                                         DangerousStarName = star.PlainName;
                                         ShowPanel(true);
@@ -100,8 +100,8 @@ namespace EDVRHUD.HUDs
         
         private int IconSize = 80;
 
-        private Pen TopLinePen = new Pen(Color.FromArgb(255, 200, 0, 0), 2f);
-        private Pen BottomLinePen = new Pen(Color.FromArgb(255, 255, 0, 0), 2f);
+        private Pen TopLinePen = new Pen(Color.FromArgb(255, 200, 0, 0), 3f);
+        private Pen BottomLinePen = new Pen(Color.FromArgb(255, 255, 0, 0), 3f);
 
 
         protected override void Redraw()
@@ -119,7 +119,7 @@ namespace EDVRHUD.HUDs
                 if (!string.IsNullOrEmpty(DangerousStarName))
                 {
                     g.DrawLine(TopLinePen, 0, 1, TextureSize.Width, 1);
-                    g.DrawLine(BottomLinePen, 0, TextureSize.Height - 1, TextureSize.Width, TextureSize.Height - 1);
+                    g.DrawLine(BottomLinePen, 0, TextureSize.Height - 2, TextureSize.Width, TextureSize.Height - 2);
 
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     g.TextRenderingHint = TextRenderingHint.AntiAlias;                    

@@ -10,6 +10,181 @@ using System.Threading.Tasks;
 
 namespace EDVRHUD
 {
+    [Flags]
+    internal enum StatusFlags : long
+    {
+        Initial = -1,
+        None = 0,
+        Docked = 1, //(on a landing pad)
+        Landed = 2, //(on planet surface)
+        GearDown = 4, //Landing Gear Down
+        ShieldsUp = 8, // Shields Up
+        Supercruise = 16, // Supercruise
+        FlightAssistOff = 32,
+        HardpointsDeployed = 64,
+        InWing = 128,
+        LightsOn = 256,
+        CargoScoopDeployed = 512,
+        SilentRunning = 1024,
+        ScoopingFuel = 2048,
+        SrvHandbrake = 4096,
+        SrvTurret = 8192,
+        SrvUnderShip = 16384,
+        SrvDriveAssist = 32768,
+        FsdMassLocked = 65536,
+        FsdCharging = 131072,
+        FsdCooldown = 262144,
+        LowFuel = 524288, // ( < 25% )
+        OverHeating = 1048576, // ( > 100% )
+        HasLatLong = 2097152,
+        IsInDanger = 4194304,
+        BeingInterdicted = 8388608,
+        InMainShip = 16777216,
+        InFighter = 33554432,
+        InSRV = 67108864,
+        HudAnalysisMode = 134217728,
+        NightVision = 268435456,
+        AltitudeFromAverageRadius = 536870912,
+        FsdJump = 1073741824,
+        SrvHighBeam = 2147483648
+    }
+
+    internal enum GUIFocus
+    {
+        Initial = -1,
+        None = 0,
+        InternalPanel = 1, //(right hand side)
+        ExternalPanel = 2, //(left hand side)
+        CommsPanel = 3, //(top)
+        RolePanel = 4, // (bottom)
+        StationServices = 5,
+        GalaxyMap = 6,
+        SystemMap = 7,
+        Orrery = 8,
+        FSS = 9,
+        SAA = 10,
+        Codex = 11
+    }
+
+    [Flags]
+    internal enum MaterialType
+    {
+        None = 0,
+        Antimony = 0b0000000000000000000000000001, //s
+        Arsenic = 0b0000000000000000000000000010, //s
+        Boron = 0b0000000000000000000000000100, //a
+        Cadmium = 0b0000000000000000000000001000, //s
+        Carbon = 0b0000000000000000000000010000, //s
+        Chromium = 0b0000000000000000000000100000, //s
+        Germanium = 0b0000000000000000000001000000, //s
+        Iron = 0b0000000000000000000010000000, //s
+        Lead = 0b0000000000000000000100000000, //a
+        Manganese = 0b0000000000000000001000000000, //s
+        Mercury = 0b0000000000000000010000000000, //s
+        Molybdenum = 0b0000000000000000100000000000, //s
+        Nickel = 0b0000000000000001000000000000, //s
+        Niobium = 0b0000000000000010000000000000, //s
+        Phosphorus = 0b0000000000000100000000000000, //s
+        Polonium = 0b0000000000001000000000000000, //s
+        Rhenium = 0b0000000000010000000000000000, //a
+        Ruthenium = 0b0000000000100000000000000000, //s
+        Selenium = 0b0000000001000000000000000000, //s
+        Sulphur = 0b0000000010000000000000000000, //s
+        Technetium = 0b0000000100000000000000000000, //s
+        Tellurium = 0b0000001000000000000000000000, //s
+        Tin = 0b0000010000000000000000000000, //s
+        Tungsten = 0b0000100000000000000000000000, //s
+        Vanadium = 0b0001000000000000000000000000, //s 
+        Yttrium = 0b0010000000000000000000000000, //s
+        Zinc = 0b0100000000000000000000000000, //s
+        Zirconium = 0b1000000000000000000000000000, //s
+        All = 0b1111111111111111111111111111
+    }
+
+    internal enum RarityType
+    {
+        VeryCommon,
+        Common,
+        Standard,
+        Rare,
+        VeryRare
+    }
+
+    internal enum StarType
+    {
+        Safe,
+        Dangerous
+    }
+
+
+    internal class Material
+    {
+        public RarityType Rarity { get; private set; } = RarityType.VeryCommon;
+        public MaterialType MaterialType { get; private set; } = MaterialType.None;
+
+        public Material(RarityType rarity, MaterialType material)
+        {
+            MaterialType = material;
+            Rarity = rarity;
+        }
+
+        public static readonly MaterialType BasicBoostMaterials =
+            MaterialType.Carbon | MaterialType.Germanium | MaterialType.Vanadium;
+
+        public static readonly MaterialType StandardBoostMaterials =
+            MaterialType.Carbon | MaterialType.Germanium | MaterialType.Vanadium |
+            MaterialType.Niobium | MaterialType.Cadmium;
+
+        public static readonly MaterialType PremiumBoostMaterials =
+            MaterialType.Carbon | MaterialType.Germanium | MaterialType.Arsenic |
+            MaterialType.Niobium | MaterialType.Yttrium | MaterialType.Polonium;
+
+        public static readonly MaterialType AllSurfaceMaterials =
+            MaterialType.Antimony | MaterialType.Arsenic | MaterialType.Cadmium | MaterialType.Carbon |
+            MaterialType.Chromium | MaterialType.Germanium | MaterialType.Iron | MaterialType.Manganese |
+            MaterialType.Mercury | MaterialType.Molybdenum | MaterialType.Nickel | MaterialType.Niobium |
+            MaterialType.Phosphorus | MaterialType.Polonium | MaterialType.Ruthenium | MaterialType.Selenium |
+            MaterialType.Sulphur | MaterialType.Technetium | MaterialType.Tellurium | MaterialType.Tin |
+            MaterialType.Tungsten | MaterialType.Vanadium | MaterialType.Yttrium | MaterialType.Zinc |
+            MaterialType.Zirconium;
+
+        public static readonly MaterialType AllMaterials = MaterialType.All;
+    }
+
+    internal class Star
+    {
+        public Star(string name, string variant, StarType starType, double k = 1200)
+        {
+            PlainName = name;
+            Variant = variant;
+            Type = starType;
+            K = k;
+        }
+        public StarType Type { get; set; }
+        public string TypeName { get { return (PlainName + " " + Variant).Trim(); } }
+
+        public string PlainName { get; set; }
+
+        public string Variant { get; set; }
+        public double K { get; set; }
+    }
+
+    internal class Planet
+    {
+        public string Name { get; set; }
+        public double K { get; set; }
+        public double K_T { get; set; }
+
+        public Planet(string name, double k = 300, double kt = 93328)
+        {
+            Name = name;
+            K = k;
+            K_T = kt;
+        }
+
+    }
+
+
     internal static class EDCommon
     {
         private static bool GetPropertyInternal<T>(IDictionary<string, object> dict, string key, T defaultValue, out T result)
@@ -63,124 +238,6 @@ namespace EDVRHUD
             GetPropertyInternal(dict, key, defaultValue, out T result);
             return result;
         }
-
-        [Flags]
-        internal enum MaterialType
-        {
-            None = 0,
-            Antimony = 0b0000000000000000000000000001, //s
-            Arsenic = 0b0000000000000000000000000010, //s
-            Boron = 0b0000000000000000000000000100, //a
-            Cadmium = 0b0000000000000000000000001000, //s
-            Carbon = 0b0000000000000000000000010000, //s
-            Chromium = 0b0000000000000000000000100000, //s
-            Germanium = 0b0000000000000000000001000000, //s
-            Iron = 0b0000000000000000000010000000, //s
-            Lead = 0b0000000000000000000100000000, //a
-            Manganese = 0b0000000000000000001000000000, //s
-            Mercury = 0b0000000000000000010000000000, //s
-            Molybdenum = 0b0000000000000000100000000000, //s
-            Nickel = 0b0000000000000001000000000000, //s
-            Niobium = 0b0000000000000010000000000000, //s
-            Phosphorus = 0b0000000000000100000000000000, //s
-            Polonium = 0b0000000000001000000000000000, //s
-            Rhenium = 0b0000000000010000000000000000, //a
-            Ruthenium = 0b0000000000100000000000000000, //s
-            Selenium = 0b0000000001000000000000000000, //s
-            Sulphur = 0b0000000010000000000000000000, //s
-            Technetium = 0b0000000100000000000000000000, //s
-            Tellurium = 0b0000001000000000000000000000, //s
-            Tin = 0b0000010000000000000000000000, //s
-            Tungsten = 0b0000100000000000000000000000, //s
-            Vanadium = 0b0001000000000000000000000000, //s 
-            Yttrium = 0b0010000000000000000000000000, //s
-            Zinc = 0b0100000000000000000000000000, //s
-            Zirconium = 0b1000000000000000000000000000, //s
-            All = 0b1111111111111111111111111111
-        }
-
-        internal enum RarityType
-        {
-            VeryCommon,
-            Common,
-            Standard,
-            Rare,
-            VeryRare
-        }
-
-        internal enum StarType
-        {
-            Safe,
-            Dangerous
-        }
-
-        internal class Material
-        {
-            public RarityType Rarity { get; private set; } = RarityType.VeryCommon;
-            public MaterialType MaterialType { get; private set; } = MaterialType.None;
-
-            public Material(RarityType rarity, MaterialType material)
-            {
-                MaterialType = material;
-                Rarity = rarity;
-            }
-
-            public static readonly MaterialType BasicBoostMaterials =
-                MaterialType.Carbon | MaterialType.Germanium | MaterialType.Vanadium;
-
-            public static readonly MaterialType StandardBoostMaterials =
-                MaterialType.Carbon | MaterialType.Germanium | MaterialType.Vanadium |
-                MaterialType.Niobium | MaterialType.Cadmium;
-
-            public static readonly MaterialType PremiumBoostMaterials =
-                MaterialType.Carbon | MaterialType.Germanium | MaterialType.Arsenic |
-                MaterialType.Niobium | MaterialType.Yttrium | MaterialType.Polonium;
-
-            public static readonly MaterialType AllSurfaceMaterials =
-                MaterialType.Antimony | MaterialType.Arsenic | MaterialType.Cadmium | MaterialType.Carbon |
-                MaterialType.Chromium | MaterialType.Germanium | MaterialType.Iron | MaterialType.Manganese |
-                MaterialType.Mercury | MaterialType.Molybdenum | MaterialType.Nickel | MaterialType.Niobium |
-                MaterialType.Phosphorus | MaterialType.Polonium | MaterialType.Ruthenium | MaterialType.Selenium |
-                MaterialType.Sulphur | MaterialType.Technetium | MaterialType.Tellurium | MaterialType.Tin |
-                MaterialType.Tungsten | MaterialType.Vanadium | MaterialType.Yttrium | MaterialType.Zinc |
-                MaterialType.Zirconium;
-
-            public static readonly MaterialType AllMaterials = MaterialType.All;
-        }
-
-        internal class Star
-        {
-            public Star(string name, string variant, StarType starType, double k = 1200)
-            {
-                PlainName = name;
-                Variant = variant;
-                Type = starType;
-                K = k;
-            }
-            public StarType Type { get; set; }
-            public string TypeName { get { return (PlainName + " " + Variant).Trim(); } }
-
-            public string PlainName { get; set; }
-
-            public string Variant { get; set; }
-            public double K { get; set; }
-        }
-
-        internal class Planet
-        {
-            public string Name { get; set; }
-            public double K { get; set; }
-            public double K_T { get; set; }
-
-            public Planet(string name, double k = 300, double kt = 93328)
-            {
-                Name = name;
-                K = k;
-                K_T = kt;
-            }
-
-        }
-
 
         public static void GetBodyValue(BodyInfo body)
         {

@@ -62,24 +62,24 @@ namespace EDVRHUD.HUDs
         public int BioSignals { get; set; }
 
     internal bool AlreadyScannedInternal { get; set; }
-        public EDCommon.MaterialType MaterialTypes { get; set; } = EDCommon.MaterialType.None;
+        public MaterialType MaterialTypes { get; set; } = MaterialType.None;
 
         public string Features { get; set; } = "";
         public int Rings { get; set; } = 0;
-        public bool HasBasicJump { get { return (MaterialTypes & EDCommon.Material.BasicBoostMaterials) == EDCommon.Material.BasicBoostMaterials; } }
-        public bool HasStandardJump { get { return (MaterialTypes & EDCommon.Material.StandardBoostMaterials) == EDCommon.Material.StandardBoostMaterials; } }
-        public bool HasPremiumJump { get { return (MaterialTypes & EDCommon.Material.PremiumBoostMaterials) == EDCommon.Material.PremiumBoostMaterials; } }
-        public bool HasAllSurfaceMaterials { get { return (MaterialTypes & EDCommon.Material.AllSurfaceMaterials) == EDCommon.Material.AllSurfaceMaterials; } }
+        public bool HasBasicJump { get { return (MaterialTypes & Material.BasicBoostMaterials) == Material.BasicBoostMaterials; } }
+        public bool HasStandardJump { get { return (MaterialTypes & Material.StandardBoostMaterials) == Material.StandardBoostMaterials; } }
+        public bool HasPremiumJump { get { return (MaterialTypes & Material.PremiumBoostMaterials) == Material.PremiumBoostMaterials; } }
+        public bool HasAllSurfaceMaterials { get { return (MaterialTypes & Material.AllSurfaceMaterials) == Material.AllSurfaceMaterials; } }
         //public bool HasAllMaterials { get { return (MaterialTypes & EDCommon.Material.AllMaterials) == EDCommon.Material.AllMaterials; } }
 
         public double Value { get; set; }
 
-        public Dictionary<EDCommon.MaterialType, double> MaterialPercents { get; } = new Dictionary<EDCommon.MaterialType, double>();
+        public Dictionary<MaterialType, double> MaterialPercents { get; } = new Dictionary<MaterialType, double>();
     }
 
     internal class ScanInfo
     {
-        public EDCommon.MaterialType SystemMaterialTypes { get; set; } = EDCommon.MaterialType.None;
+        public MaterialType SystemMaterialTypes { get; set; } = MaterialType.None;
         public long SystemAddress { get; set; } = 0;
 
         public string SystemName { get; set; }
@@ -87,27 +87,28 @@ namespace EDVRHUD.HUDs
         public int Signals { get; set; } = 0;
         public int BodyCount { get; set; } = 0;
         public bool Discovered { get; set; } = false;
-
+        public bool WarnedValuable { get; set; } = false;
 
         public Dictionary<int, BodyInfo> Bodies { get; } = new Dictionary<int, BodyInfo>();
 
         public void Clear()
         {
+            WarnedValuable = false;
             Discovered = false;
             BodyCount = 1; //at least one star
             Signals = 0;
             Progress = 0;
             SystemAddress = 0;
             SystemName = "";
-            SystemMaterialTypes = EDCommon.MaterialType.None;
+            SystemMaterialTypes = MaterialType.None;
             Bodies.Clear();
         }
 
-        public bool HasBasicJump { get { return (SystemMaterialTypes & EDCommon.Material.BasicBoostMaterials) == EDCommon.Material.BasicBoostMaterials; } }
-        public bool HasStandardJump { get { return (SystemMaterialTypes & EDCommon.Material.StandardBoostMaterials) == EDCommon.Material.StandardBoostMaterials; } }
-        public bool HasPremiumJump { get { return (SystemMaterialTypes & EDCommon.Material.PremiumBoostMaterials) == EDCommon.Material.PremiumBoostMaterials; } }
-        public bool HasGoldMaterials { get { return (SystemMaterialTypes & EDCommon.Material.AllSurfaceMaterials) == EDCommon.Material.AllSurfaceMaterials; } }
-        public bool HasAllMaterials { get { return (SystemMaterialTypes & EDCommon.Material.AllMaterials) == EDCommon.Material.AllMaterials; } }
+        public bool HasBasicJump { get { return (SystemMaterialTypes & Material.BasicBoostMaterials) == Material.BasicBoostMaterials; } }
+        public bool HasStandardJump { get { return (SystemMaterialTypes & Material.StandardBoostMaterials) == Material.StandardBoostMaterials; } }
+        public bool HasPremiumJump { get { return (SystemMaterialTypes & Material.PremiumBoostMaterials) == Material.PremiumBoostMaterials; } }
+        public bool HasGoldMaterials { get { return (SystemMaterialTypes & Material.AllSurfaceMaterials) == Material.AllSurfaceMaterials; } }
+        public bool HasAllMaterials { get { return (SystemMaterialTypes & Material.AllMaterials) == Material.AllMaterials; } }
     }
 
     internal class ScanInfoPanel : HudPanel
@@ -115,6 +116,8 @@ namespace EDVRHUD.HUDs
         private ScanInfo Scan = new ScanInfo();
 
         private Font PanelFont;
+
+        
 
         //public ScanInfoPanel(Size size, ref HmdMatrix34_t position) : base(HudType.ScanInfo, "ScanInfo", size, position)
         //{
@@ -126,11 +129,20 @@ namespace EDVRHUD.HUDs
             PanelFont = new Font(NotificationApp.EDFont.FontFamily, 18);
         }
 
-        internal override void GUIFocusChanged(int guiFocus)
-        {
-            if (guiFocus == 4)
+        internal override void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
+        {            
+            if (!Scan.WarnedValuable && status.HasFlag(StatusFlags.FsdCharging))
+            {
+                Scan.WarnedValuable = true;
+                //warn if non mapped valuable planets left
+                var cnt = Scan.Bodies.Count(p => !p.Value.SelfMapped && p.Value.Terraformable);
+                if (cnt > 0)
+                    NotificationApp.Talk("Leaving system with " + cnt + " unmapped valuable bod" + (cnt == 1? "y" : "ies") + ".");
+            }
+
+            if (guiFocus == GUIFocus.RolePanel || !status.HasFlag(StatusFlags.InMainShip))
                 ShowPanel(false);
-            else
+            else 
                 ShowPanel(true);
         }
 
@@ -200,7 +212,9 @@ namespace EDVRHUD.HUDs
 
                             if (body.BioSignals > 0)
                                 NotificationApp.Talk("Body " + body.Name + " has " + body.BioSignals + " biological signals.");
-                        }                        
+                            if (body.GeoSignals > 0)
+                                NotificationApp.Talk("Body " + body.Name + " has " + body.BioSignals + " geological signals.");
+                        }
                     }
                     break;
                 case "SAAScanComplete":
@@ -218,7 +232,7 @@ namespace EDVRHUD.HUDs
                             if (body.IsPlanet && body.Value > 10000)
                             {
                                 var val = ((int)(body.Value / 1000) * 1000).ToString("N0");
-                                NotificationApp.Talk("Mapped " + body.TerraformState + " " + body.FullName + " for " + val + " credits.");
+                                NotificationApp.Talk("Mapped " + body.Name + "." + body.TerraformState + " " + body.BodyType + ", " + val + " credits.");
                             }
                             Redraw();
                         }
@@ -348,7 +362,7 @@ namespace EDVRHUD.HUDs
                                 if (body.Value > 20000)
                                 {
                                     var val = ((int)(body.Value / 1000) * 1000).ToString("N0");
-                                    NotificationApp.Talk("Scanned " + body.Name + "," + body.TerraformState + " " + body.BodyType + " for " + val + " credits.");
+                                    NotificationApp.Talk("Scanned " + body.Name + "." + body.TerraformState + " " + body.BodyType + ", " + val + " credits.");
                                 }
 
                                 var featureText = "";
@@ -369,7 +383,7 @@ namespace EDVRHUD.HUDs
                                     featureText += "Jackpot! Terraformable body is landable.";
                                 if (body.Features.Contains(" A "))
                                     featureText += "Jackpot! Body has all surface materials.";
-                                if (body.Features.Contains(" P "))
+                                if (body.Features.Contains(" S "))
                                     featureText += "Body has all standard jumponium materials.";
                                 if (body.Features.Contains(" P "))
                                     featureText += "Jackpot! Body has all premium jumponium materials.";
@@ -377,7 +391,7 @@ namespace EDVRHUD.HUDs
                                     featureText += "Body has " + body.Rings + " rings.";
 
                                 if (!string.IsNullOrEmpty(featureText))                                    
-                                    NotificationApp.Talk(body.Name + "," + body.TerraformState + " " + body.BodyType + " scan complete." + featureText);
+                                    NotificationApp.Talk("Body " + body.Name + "." + body.TerraformState + " " + body.BodyType + " scan complete." + featureText);
                             }
 
                             Redraw();
@@ -407,6 +421,11 @@ namespace EDVRHUD.HUDs
         private readonly Brush MappedBrush = new SolidBrush(Color.FromArgb(255, 250, 250, 50));
         private readonly Brush InterestBrush = new SolidBrush(Color.FromArgb(255, 0, 255, 0));
         private readonly Brush PreviouslyDiscoveredBrush = new SolidBrush(Color.FromArgb(125, 255, 100, 0));
+        private readonly Brush PreviouslyMappedBrush = new SolidBrush(Color.FromArgb(255, 250, 30, 50));
+
+        private Pen TopLinePen = new Pen(Color.FromArgb(255, 171, 80, 6), 3f);
+        private Pen BottomLinePen = new Pen(Color.FromArgb(255, 194, 102, 7), 3f);
+
 
         private int IconSize = 40;
         private int TopPadding = 3;
@@ -417,8 +436,9 @@ namespace EDVRHUD.HUDs
             {
                 g.Clear(NotificationApp.DefaultClearColor);
                 g.FillRectangle(BackgroundBrush, 0, 0, TextureSize.Width, TextureSize.Height);
-                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
                 g.TextRenderingHint = TextRenderingHint.AntiAlias;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
                 var str = " " + Scan.Signals;
 
@@ -434,15 +454,15 @@ namespace EDVRHUD.HUDs
                 if (!string.IsNullOrEmpty(mats))
                     str += "  [ " + mats + "]";
 
-                var y = TopPadding;
+                var y = TopPadding + 3;
 
-                g.DrawImage(Properties.Resources.Signal, 0, 0, IconSize, IconSize);
+                g.DrawImage(Scan.Signals > 0 ? Properties.Resources.SignalAvail : Properties.Resources.Signal, 0, 3, IconSize, IconSize);
                 g.DrawString(str, NotificationApp.EDFont, Scan.Signals > 0? InterestBrush : NotificationApp.DefaultBrush, IconSize, y);
 
                 str = string.Format(CultureInfo.InvariantCulture, " {0,5:N0}", 100 * Scan.Progress) + " % - " + string.Format("{0,2}", Scan.Bodies.Count) + "/" + string.Format("{0,2}", Scan.BodyCount);
                 var size = g.MeasureString(str, NotificationApp.EDFont);
                 var percentStart = TextureSize.Width - size.Width;
-                g.DrawImage(Properties.Resources.Scan, percentStart - IconSize, 0, IconSize, IconSize);
+                g.DrawImage(Properties.Resources.Scan, percentStart - IconSize, 3, IconSize, IconSize);
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, percentStart, y);
 
 
@@ -457,32 +477,34 @@ namespace EDVRHUD.HUDs
                     totalCredits += body.Value;
                     if (body.IsStar)
                         g.DrawImage(Properties.Resources.Star, 0, y, IconSize, IconSize);
-                    else if (body.BodyType == "Earthlike body")
-                        g.DrawImage(Properties.Resources.Earth, 0, y, IconSize, IconSize);
-                    else if (body.BodyType == "Ammonia world")
-                        g.DrawImage(Properties.Resources.AmmoniaWorld, 0, y, IconSize, IconSize);
-                    else if (body.BodyType == "Water world")
-                        g.DrawImage(Properties.Resources.WaterWorld, 0, y, IconSize, IconSize);
-                    else if (body.Rings > 0)
-                        g.DrawImage(Properties.Resources.RingedPlanet, 0, y, IconSize, IconSize);
-                    else if (body.Landable)
-                        g.DrawImage(Properties.Resources.Landable, 0, y, IconSize, IconSize);
+                    else if (body.BodyType.ToLowerInvariant().Contains("earthlike body"))
+                        g.DrawImage(Properties.Resources.EarthLike, 0, y, IconSize, IconSize);
+                    else if (body.BodyType.ToLowerInvariant().Contains("gas giant"))
+                        g.DrawImage(Properties.Resources.GasGiant, 0, y, IconSize, IconSize);
                     else
                         g.DrawImage(Properties.Resources.Planet, 0, y, IconSize, IconSize);
+
+                    if (body.Rings > 0) //overlay ring
+                        g.DrawImage(Properties.Resources.Ring, 0, y, IconSize, IconSize);
+
+                    if (body.Landable) //overlay landable
+                        g.DrawImage(Properties.Resources.Landable, 0, y, IconSize, IconSize);
 
                     Brush brush = NotificationApp.DefaultBrush;
 
                     if (body.IsStar)
                     {
-                        str = (body.Name + " " + body.StarName + " / " + body.StarSubClass + body.StarLuminosity).Trim();
-                        if (body.PreviouslyDiscovered) brush = PreviouslyDiscoveredBrush;
+                        str = ((body.Name + " " + body.StarName).Trim() + " (" + body.StarSubClass + body.StarLuminosity + ")").Trim();
+                        if (body.PreviouslyDiscovered) brush = PreviouslyMappedBrush;
                     }
                     else
                     {
                         str = (body.Name + " - " + body.BodyType).Trim();
                         if (body.SelfMapped) 
                             brush = MappedBrush;
-                        else if (body.PreviouslyMapped) 
+                        else if (body.PreviouslyMapped)
+                            brush = PreviouslyMappedBrush;
+                        else if (body.PreviouslyDiscovered)
                             brush = PreviouslyDiscoveredBrush;
                     }
 
@@ -508,8 +530,12 @@ namespace EDVRHUD.HUDs
                 var creditStart = (percentStart - IconSize) / 2;
                 str = string.Format(" {0,11:N0} cr", totalCredits);
                 size = g.MeasureString(str, NotificationApp.EDFont);
-                g.DrawImage(Properties.Resources.Credit, creditStart, 0, IconSize, IconSize);
+                g.DrawImage(Properties.Resources.Credit, creditStart, 3, IconSize, IconSize);
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, creditStart + IconSize, TopPadding);
+
+                g.DrawLine(TopLinePen, 0, 1, TextureSize.Width, 1);
+                g.DrawLine(BottomLinePen, 0, TextureSize.Height - 2, TextureSize.Width, TextureSize.Height - 2);
+
                 g.Flush();
             }
             PanelUpdated = 2;

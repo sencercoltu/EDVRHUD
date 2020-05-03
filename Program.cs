@@ -17,11 +17,9 @@ namespace EDVRHUD
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-//#if UseOpenVR
             var path = Environment.CurrentDirectory + "\\openvr_api.dll";
             if (File.Exists(path)) File.Delete(path);
             File.WriteAllBytes(path, Properties.Resources.openvr_api);
-//#endif //UseOpenVR
 
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
 
