@@ -1,13 +1,11 @@
-﻿using SharpDX.Direct3D11;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Text;
 using System.Globalization;
 using System.Linq;
-using Valve.VR;
+using System.Security.Policy;
 
 namespace EDVRHUD.HUDs
 {
@@ -61,7 +59,8 @@ namespace EDVRHUD.HUDs
 
         public int BioSignals { get; set; }
 
-    internal bool AlreadyScannedInternal { get; set; }
+        internal bool AlreadyScannedInternal { get; set; }
+
         public MaterialType MaterialTypes { get; set; } = MaterialType.None;
 
         public string Features { get; set; } = "";
@@ -81,10 +80,10 @@ namespace EDVRHUD.HUDs
     {
         public MaterialType SystemMaterialTypes { get; set; } = MaterialType.None;
         public long SystemAddress { get; set; } = 0;
-
+        public bool MainStarAutoscanComplete { get; set; } = false;
         public string SystemName { get; set; }
         public double Progress { get; set; } = 0;
-        public int Signals { get; set; } = 0;
+        public HashSet<string> Signals { get; set; } = new HashSet<string>();
         public int BodyCount { get; set; } = 0;
         public bool Discovered { get; set; } = false;
         public bool WarnedValuable { get; set; } = false;
@@ -96,19 +95,20 @@ namespace EDVRHUD.HUDs
             WarnedValuable = false;
             Discovered = false;
             BodyCount = 1; //at least one star
-            Signals = 0;
+            Signals.Clear();
             Progress = 0;
             SystemAddress = 0;
             SystemName = "";
             SystemMaterialTypes = MaterialType.None;
+            MainStarAutoscanComplete = false;
             Bodies.Clear();
         }
 
         public bool HasBasicJump { get { return (SystemMaterialTypes & Material.BasicBoostMaterials) == Material.BasicBoostMaterials; } }
         public bool HasStandardJump { get { return (SystemMaterialTypes & Material.StandardBoostMaterials) == Material.StandardBoostMaterials; } }
         public bool HasPremiumJump { get { return (SystemMaterialTypes & Material.PremiumBoostMaterials) == Material.PremiumBoostMaterials; } }
-        public bool HasGoldMaterials { get { return (SystemMaterialTypes & Material.AllSurfaceMaterials) == Material.AllSurfaceMaterials; } }
-        public bool HasAllMaterials { get { return (SystemMaterialTypes & Material.AllMaterials) == Material.AllMaterials; } }
+        public bool HasAllSurfaceMaterials { get { return (SystemMaterialTypes & Material.AllSurfaceMaterials) == Material.AllSurfaceMaterials; } }
+        //public bool HasAllMaterials { get { return (SystemMaterialTypes & Material.AllMaterials) == Material.AllMaterials; } }
     }
 
     internal class ScanInfoPanel : HudPanel
@@ -117,7 +117,7 @@ namespace EDVRHUD.HUDs
 
         private Font PanelFont;
 
-        
+        private bool AutoDiscoveryScanActive = false;
 
         //public ScanInfoPanel(Size size, ref HmdMatrix34_t position) : base(HudType.ScanInfo, "ScanInfo", size, position)
         //{
@@ -129,15 +129,15 @@ namespace EDVRHUD.HUDs
             PanelFont = new Font(NotificationApp.EDFont.FontFamily, 18);
         }
 
-        internal override void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
+        internal override void OnEDStatusChanged(StatusFlags status, GUIFocus guiFocus)
         {            
             if (!Scan.WarnedValuable && status.HasFlag(StatusFlags.FsdCharging))
             {
                 Scan.WarnedValuable = true;
                 //warn if non mapped valuable planets left
-                var cnt = Scan.Bodies.Count(p => !p.Value.SelfMapped && p.Value.Terraformable);
+                var cnt = Scan.Bodies.Count(p => !p.Value.SelfMapped && p.Value.Value > 100000);
                 if (cnt > 0)
-                    NotificationApp.Talk("Leaving system with " + cnt + " unmapped valuable bod" + (cnt == 1? "y" : "ies") + ".");
+                    NotificationApp.Talk("Leaving system with " + cnt + " unmapped valuable bod" + (cnt == 1? "y" : "ies") + " behind.");
             }
 
             if (guiFocus == GUIFocus.RolePanel || !status.HasFlag(StatusFlags.InMainShip))
@@ -149,7 +149,7 @@ namespace EDVRHUD.HUDs
 
         private System.Timers.Timer SignalTimer = null;
 
-        public override void JournalUpdate(string eventType, Dictionary<string, object> eventData)
+        public override void OnJournalUpdate(string eventType, Dictionary<string, object> eventData)
         {
             switch (eventType)
             {
@@ -159,25 +159,33 @@ namespace EDVRHUD.HUDs
                     }
                     break;
                 case "FSSSignalDiscovered":
-                    {                        
-                        Scan.Signals++;
-                        //delay signal speech
-                        if (SignalTimer != null)
+                    {
+                        var signalName = eventData.GetProperty("SignalName", "");
+                        if (string.IsNullOrEmpty(signalName))
+                            return;
+                        Scan.Signals.Add(signalName);
+
+                        if (NotificationApp.Settings.Signals)
                         {
-                            SignalTimer.Stop();
-                            SignalTimer.Dispose();
-                            SignalTimer = null;
+                            //delay signal speech
+                            if (SignalTimer != null)
+                            {
+                                SignalTimer.Stop();
+                                SignalTimer.Dispose();
+                                SignalTimer = null;
+                            }
+                            SignalTimer = new System.Timers.Timer(1000)
+                            {
+                                AutoReset = false
+                            };
+                            SignalTimer.Elapsed += (sender, args) =>
+                            {
+                                NotificationApp.Talk(Scan.Signals.Count + " signal" + (Scan.Signals.Count > 1 ? "s" : "") + " detected in system.");
+                                SignalTimer.Dispose();
+                                SignalTimer = null;
+                            };
+                            SignalTimer.Start();
                         }
-                        SignalTimer = new System.Timers.Timer(1000);
-                        SignalTimer.AutoReset = false;
-                        SignalTimer.Elapsed += (sender, args) =>
-                        {
-                            NotificationApp.Talk(Scan.Signals + " signal" + (Scan.Signals > 1 ? "s" : "") + " detected in system.");
-                            SignalTimer.Dispose();
-                            SignalTimer = null;
-                        };
-                        SignalTimer.Start();
-                        
                         Redraw();
                     }
                     break;
@@ -187,6 +195,8 @@ namespace EDVRHUD.HUDs
                             Scan.BodyCount = bc;
                         Scan.Progress = eventData.GetProperty("Progress", 0.0);
                         Redraw();
+                        StopAutoDiscovery();
+
                     }
                     break;
                 case "FSSAllBodiesFound":
@@ -197,6 +207,7 @@ namespace EDVRHUD.HUDs
                             Scan.Progress = 1;
                         }
                         Redraw();
+                        StopAutoDiscovery();
                     }
                     break;
                 case "SAASignalsFound":
@@ -229,10 +240,10 @@ namespace EDVRHUD.HUDs
                             body.SelfMapped = true;
                             body.MapEfficency = pu <= et;
                             EDCommon.GetBodyValue(body);
-                            if (body.IsPlanet && body.Value > 10000)
+                            //if (body.IsPlanet && body.Value > 30000)
                             {
                                 var val = ((int)(body.Value / 1000) * 1000).ToString("N0");
-                                NotificationApp.Talk("Mapped " + body.Name + "." + body.TerraformState + " " + body.BodyType + ", " + val + " credits.");
+                                NotificationApp.Talk("Mapped " + EDCommon.FixBodyNameSpelling(body.Name) + "!" + body.TerraformState + " " + EDCommon.FixBodyTypeSpelling(body.BodyType) + ", " + val + " credits.");
                             }
                             Redraw();
                         }
@@ -240,6 +251,12 @@ namespace EDVRHUD.HUDs
                     break;
                 case "Scan":
                     {
+                        var st = eventData.GetProperty("ScanType", "");
+                        if (st == "AutoScan")
+                        {
+                            StartAutoDiscovery();
+                            Scan.MainStarAutoscanComplete = true;
+                        }
                         if (eventData.GetProperty("BodyID", -1, out var bodyId))
                         {
                             var bodyName = eventData.GetProperty("BodyName", "");
@@ -256,7 +273,7 @@ namespace EDVRHUD.HUDs
                             }
 
                             var discovered = eventData.GetProperty("WasDiscovered", false);
-                            var mapped = eventData.GetProperty("WasDiscovered", false);                            
+                            var mapped = eventData.GetProperty("WasMapped", false);                            
 
                             var starType = eventData.GetProperty("StarType", "");
 
@@ -273,7 +290,8 @@ namespace EDVRHUD.HUDs
                                 //if (string.IsNullOrEmpty(starType))
                                 //{
                                     var starSystem = eventData.GetProperty("StarSystem", "");
-                                    body.Name = body.Name.Substring(starSystem.Length).Trim();
+                                    if (body.Name.Contains(starSystem))
+                                        body.Name = body.Name.Substring(starSystem.Length).Trim();
                                 //}
 
                                 Scan.Bodies.Add(bodyId, body);
@@ -288,6 +306,8 @@ namespace EDVRHUD.HUDs
 
                             if (!string.IsNullOrEmpty(starType))
                             {
+                                if (starType.StartsWith("W") && !discovered)
+                                    NotificationApp.Talk("Undiscovered Wolf Rayet star found in system.");
                                 body.IsStar = true;
                                 body.BodyType = starType;
                                 if (EDCommon.StarLookup.TryGetValue(starType, out var s))
@@ -345,12 +365,12 @@ namespace EDVRHUD.HUDs
                                 if (body.Terraformable && body.Landable) features += " LT ";
                                 if (body.Landable)
                                 {
-                                    if (body.Gravity > 3) features += " HG ";
-                                    else if (body.Gravity < 0.03) features += " LG ";
+                                    if (body.Gravity > 4) features += " HG ";
+                                    else if (body.Gravity < 0.01) features += " LG ";
                                 }
                                 if (body.RotationPeriod <= 1) features += " FR ";
                                 if (body.OrbitalPeriod <= 1) features += " FO ";
-                                if (body.Radius <= 300) features += " SR ";
+                                if (body.Radius <= 150) features += " SR ";
                                 if (body.Rings > 2) features += " R" + body.Rings + " ";
                                 body.Features = features;
                             }
@@ -358,40 +378,48 @@ namespace EDVRHUD.HUDs
                             EDCommon.GetBodyValue(body);
                             if (body.IsPlanet && !body.AlreadyScannedInternal)
                             {
-                                body.AlreadyScannedInternal = true;                                
-                                if (body.Value > 20000)
-                                {
-                                    var val = ((int)(body.Value / 1000) * 1000).ToString("N0");
-                                    NotificationApp.Talk("Scanned " + body.Name + "." + body.TerraformState + " " + body.BodyType + ", " + val + " credits.");
-                                }
+                                body.AlreadyScannedInternal = true;
 
                                 var featureText = "";
+                                var speechtext = "Scanned " + EDCommon.FixBodyNameSpelling(body.Name) + "!" + body.TerraformState + " " + EDCommon.FixBodyTypeSpelling(body.BodyType);
 
                                 if (body.Features.Contains(" LG "))
-                                    featureText += "Body has gravity of " + body.Gravity.ToString("N2") + " G.";
+                                    featureText += " Body has gravity of " + body.Gravity.ToString("N2") + " G.";
                                 else if (body.Features.Contains(" HG "))
-                                    featureText += "Warning. Body has a gravity of " + body.Gravity.ToString("N2") + " G.";
+                                    featureText += " Warning! Body has a gravity of " + body.Gravity.ToString("N2") + " G.";
                                 if (body.Features.Contains(" FR "))
-                                    featureText += "Body rotational period is " + body.RotationPeriod.ToString("N1") + " hours.";
+                                    featureText += " Body rotational period is " + body.RotationPeriod.ToString("N1") + " hours.";
                                 if (body.Features.Contains(" FO "))
-                                    featureText += "Body orbit period is " + body.RotationPeriod.ToString("N1") + " hours.";
+                                    featureText += " Body orbit period is " + body.OrbitalPeriod.ToString("N1") + " hours.";
                                 if (body.Features.Contains(" SR "))
-                                    featureText += "Body radius is " + body.RotationPeriod.ToString("N0") + " kilometers.";
+                                    featureText += " Body radius is " + body.Radius.ToString("N0") + " kilometers.";
                                 if (body.Features.Contains(" LA "))
-                                    featureText += "Jackpot! Body with atmosphere is landable.";
+                                    featureText += " Jackpot! Body with atmosphere is landable.";
                                 if (body.Features.Contains(" LT "))
-                                    featureText += "Jackpot! Terraformable body is landable.";
+                                    featureText += " Jackpot! Terraformable body is landable.";
                                 if (body.Features.Contains(" A "))
-                                    featureText += "Jackpot! Body has all surface materials.";
+                                    featureText += " Jackpot! Body has all surface materials.";
                                 if (body.Features.Contains(" S "))
-                                    featureText += "Body has all standard jumponium materials.";
+                                    featureText += " Body has all standard jumponium materials.";
                                 if (body.Features.Contains(" P "))
-                                    featureText += "Jackpot! Body has all premium jumponium materials.";
+                                    featureText += " Jackpot! Body has all premium jumponium materials.";
                                 if (body.Rings > 2)
-                                    featureText += "Body has " + body.Rings + " rings.";
+                                    featureText += " Body has " + body.Rings + " rings.";
 
-                                if (!string.IsNullOrEmpty(featureText))                                    
-                                    NotificationApp.Talk("Body " + body.Name + "." + body.TerraformState + " " + body.BodyType + " scan complete." + featureText);
+                                if (body.Value > 30000)
+                                {
+                                    var val = ((int)(body.Value / 1000) * 1000).ToString("N0");
+                                    speechtext += ", " + val + " credits.";
+                                    speechtext += featureText;
+                                }
+                                else if (!string.IsNullOrEmpty(featureText))
+                                    speechtext += "." + featureText;
+                                else
+                                    speechtext = "";
+
+
+                                if (!string.IsNullOrEmpty(speechtext))
+                                    NotificationApp.Talk(speechtext);
                             }
 
                             Redraw();
@@ -412,8 +440,29 @@ namespace EDVRHUD.HUDs
                         Scan.SystemAddress = eventData.GetProperty("SystemAddress", 0L);
                         Scan.SystemName = eventData.GetProperty("StarSystem", "");
                         Redraw();
+
+
                     }
                     break;
+            }
+        }
+
+        private void StartAutoDiscovery()
+        {
+            if (NotificationApp.EDFlags.HasFlag(StatusFlags.HudAnalysisMode) && NotificationApp.Settings.AutoDiscoveryScan && !NotificationApp.InitialLoad && !Scan.MainStarAutoscanComplete)
+            {
+                AutoDiscoveryScanActive = true;
+                NotificationApp.Talk("Auto discovery scan initiated.");
+                NotificationApp.InputSimulator.Mouse.RightButtonDown(); //todo: get button/key from setting
+            }
+        }
+
+        private void StopAutoDiscovery()
+        {
+            if (AutoDiscoveryScanActive) //stop if started
+            {
+                AutoDiscoveryScanActive = false;
+                NotificationApp.InputSimulator.Mouse.RightButtonUp(); //todo: get button/key from setting                
             }
         }
 
@@ -430,7 +479,7 @@ namespace EDVRHUD.HUDs
         private int IconSize = 40;
         private int TopPadding = 3;
 
-        protected override void Redraw()
+        protected override void OnRedrawPanel()
         {
             using (var g = GetGraphics())
             {
@@ -440,15 +489,16 @@ namespace EDVRHUD.HUDs
                 g.TextRenderingHint = TextRenderingHint.AntiAlias;
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-                var str = " " + Scan.Signals;
+                var str = " " + Scan.Signals.Count;
 
                 var mats = "";
-                if (Scan.HasStandardJump) mats += "S ";
-                else if (Scan.HasBasicJump) mats += "B ";
-                
-                if (Scan.HasPremiumJump) mats += "P ";
-                if (Scan.HasGoldMaterials) mats += "G ";
-                if (Scan.HasAllMaterials) mats += "A ";
+                if (Scan.HasAllSurfaceMaterials) mats += "A ";
+                else
+                {
+                    if (Scan.HasPremiumJump) mats += "P ";
+                    if (Scan.HasStandardJump) mats += "S ";
+                    else if (Scan.HasBasicJump) mats += "B ";
+                }
 
 
                 if (!string.IsNullOrEmpty(mats))
@@ -456,14 +506,17 @@ namespace EDVRHUD.HUDs
 
                 var y = TopPadding + 3;
 
-                g.DrawImage(Scan.Signals > 0 ? Properties.Resources.SignalAvail : Properties.Resources.Signal, 0, 3, IconSize, IconSize);
-                g.DrawString(str, NotificationApp.EDFont, Scan.Signals > 0? InterestBrush : NotificationApp.DefaultBrush, IconSize, y);
+                g.DrawImage(Scan.Signals.Count > 0 ? Properties.Resources.SignalAvail : Properties.Resources.Signal, 0, 3, IconSize, IconSize);
+                g.DrawString(str, NotificationApp.EDFont, Scan.Signals.Count > 0? InterestBrush : NotificationApp.DefaultBrush, IconSize, y);
 
-                str = string.Format(CultureInfo.InvariantCulture, " {0,5:N0}", 100 * Scan.Progress) + " % - " + string.Format("{0,2}", Scan.Bodies.Count) + "/" + string.Format("{0,2}", Scan.BodyCount);
+                str = string.Format(CultureInfo.InvariantCulture, " {0,5:N0}", 100 * Scan.Progress) + " % - ";
+                if (Scan.Progress != 1)
+                    str += string.Format("{0,2}", Scan.Bodies.Count) + "/";
+                str += string.Format("{0,2}", Scan.BodyCount) + " Bodies";
                 var size = g.MeasureString(str, NotificationApp.EDFont);
                 var percentStart = TextureSize.Width - size.Width;
                 g.DrawImage(Properties.Resources.Scan, percentStart - IconSize, 3, IconSize, IconSize);
-                g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, percentStart, y);
+                g.DrawString(str, NotificationApp.EDFont, Scan.Progress == 1? InterestBrush : NotificationApp.DefaultBrush, percentStart, y);
 
 
                 y += IconSize;
@@ -471,7 +524,7 @@ namespace EDVRHUD.HUDs
 
                 foreach (var body in Scan.Bodies.Values
                     .OrderByDescending(p => p.Terraformable)
-                    .ThenByDescending(p => p.Features.Length)
+                    .ThenByDescending(p => p.Features.Replace(" B", "").Trim().Length)
                     .ThenByDescending(p => p.Value))
                 {
                     totalCredits += body.Value;

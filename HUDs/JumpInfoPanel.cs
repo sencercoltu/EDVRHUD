@@ -19,9 +19,9 @@ namespace EDVRHUD.HUDs
         {
         }
 
-        private GUIFocus[] VisibleGuiFocus = new[] { GUIFocus.None, GUIFocus.InternalPanel, GUIFocus.ExternalPanel, GUIFocus.CommsPanel, GUIFocus.RolePanel };        
+        private GUIFocus[] VisibleGuiFocus = new[] { GUIFocus.None, GUIFocus.InternalPanel, GUIFocus.ExternalPanel, GUIFocus.CommsPanel, GUIFocus.RolePanel };
 
-        internal override void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
+        internal override void OnEDStatusChanged(StatusFlags status, GUIFocus guiFocus)
         {
             if (VisibleGuiFocus.Contains(guiFocus) && status.HasFlag(StatusFlags.InMainShip))
                 ShowPanel(true);
@@ -31,10 +31,13 @@ namespace EDVRHUD.HUDs
 
         private string TargetStarType = "";
         private string TargetStarSystem = "";
+        private bool TargetScoopable = false;
         private int RemainingJumps = 0;
         private double JetConeBoost = 1;
         private bool ActiveRoute = false;
-        public override void JournalUpdate(string eventType, Dictionary<string, object> eventData)
+
+
+        public override void OnJournalUpdate(string eventType, Dictionary<string, object> eventData)
         {
             switch (eventType)
             {
@@ -54,7 +57,15 @@ namespace EDVRHUD.HUDs
                         if (eventData.GetProperty("JumpType", "") == "Hyperspace")
                         {
                             if (EDCommon.StarLookup.TryGetValue(eventData.GetProperty("StarClass", "Unknown"), out var star))
+                            {
                                 TargetStarType = star.TypeName;
+                                TargetScoopable = star.Scoopable;
+                            }
+                            else
+                            {
+                                TargetStarType = "Unknown";
+                                TargetScoopable = false;
+                            }
                             TargetStarSystem = eventData.GetProperty("StarSystem", "Unknown");
                             if (RemainingJumps > 0) RemainingJumps--;
                             Redraw();
@@ -75,27 +86,27 @@ namespace EDVRHUD.HUDs
                     {
                         //reset jcb
                         //if (RemainingJumps == 1) RemainingJumps = 0;
-                        NotificationApp.Shutup();                                     
+                        NotificationApp.Shutup();
                         JetConeBoost = 1;
                         Redraw();
                         if (RemainingJumps == 0 && ActiveRoute)
                         {
                             ActiveRoute = false;
-                            NotificationApp.Talk("Reached destination " + TargetStarSystem);
+                            NotificationApp.Talk("Arrived at route destination " + TargetStarSystem);
                         }
-
                     }
                     break;
             }
         }
 
         private Brush BackgroundBrush = new SolidBrush(Color.FromArgb(5, 0, 0, 0));
+        private Brush NonScoopableBrush = new SolidBrush(Color.FromArgb(255, 75, 0));
 
         private Pen TopLinePen = new Pen(Color.FromArgb(255, 171, 80, 6), 3f);
         private Pen BottomLinePen = new Pen(Color.FromArgb(255, 194, 102, 7), 3f);
 
         private int IconSize = 40;
-        protected override void Redraw()
+        protected override void OnRedrawPanel()
         {
             var w = TextureSize.Width / 8;
             using (var g = GetGraphics())
@@ -113,18 +124,18 @@ namespace EDVRHUD.HUDs
                 var y = 3;
                 g.DrawImage(Properties.Resources.Star, x, y, IconSize, IconSize);
                 x += IconSize;
-                var str = " " + (string.IsNullOrEmpty(TargetStarType)? "?" : TargetStarType); 
-                g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, x, y + 4);
-                
-                
+                var str = " " + (string.IsNullOrEmpty(TargetStarType) ? "?" : TargetStarType);
+                g.DrawString(str, NotificationApp.EDFont, TargetScoopable? NotificationApp.DefaultBrush : NonScoopableBrush, x, y + 4);
+
+
                 x = w * 5;
                 g.DrawImage(Properties.Resources.Jump, x, y, IconSize, IconSize);
                 x += IconSize;
-                str = "    " + RemainingJumps.ToString(); str = str.Substring(str.Length - 4);                                
+                str = "    " + RemainingJumps.ToString(); str = str.Substring(str.Length - 4);
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, x, y + 4);
                 x += w;
 
-                g.DrawImage(JetConeBoost > 1? Properties.Resources.JetBoosted : Properties.Resources.JetBoost, x, y, IconSize, IconSize);
+                g.DrawImage(JetConeBoost > 1 ? Properties.Resources.JetBoosted : Properties.Resources.JetBoost, x, y, IconSize, IconSize);
                 x += IconSize;
                 str = " " + JetConeBoost.ToString("N1", CultureInfo.InvariantCulture);
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, x, y + 4);

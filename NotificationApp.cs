@@ -1,4 +1,5 @@
 ﻿using EDVRHUD.HUDs;
+using LiteDB;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System;
@@ -15,7 +16,9 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
+using System.Xml;
 using Valve.VR;
+using WindowsInput;
 
 namespace EDVRHUD
 {
@@ -28,13 +31,19 @@ namespace EDVRHUD
             public int VoiceRate { get; set; } = 4; //-10 to 10
             public int VoiceVolume { get; set; } = 100; //0 to 100
             public bool UseOpenVR { get; set; } = true;
+            public bool AutoDiscoveryScan { get; set; } = false;
+            public bool EDSMDestinationSystem { get; set; } = false;
+            public bool EDSMNearbySystems { get; set; } = false;
+            public bool Signals { get; set; } = false;
         }
 
-        public static bool InitialLoad = false;
+        public static bool InitialLoad { get; private set; } = false;
 
         public static HudSettings Settings { get; set; } = new HudSettings();
 
         internal static SpeechSynthesizer Speech = new SpeechSynthesizer();
+        private static XmlElement EDBindings = null;
+
 
         public static void Talk(string s, bool async = true)
         {
@@ -58,6 +67,8 @@ namespace EDVRHUD
         private static JavaScriptSerializer Serializer { get; } = new JavaScriptSerializer();
         public static Font EDFont { get; private set; }
 
+        public static InputSimulator InputSimulator = new InputSimulator();
+
         public static SolidBrush DefaultBrush = new SolidBrush(Color.FromArgb(245, 178, 9));
         public static Color DefaultClearColor = Color.FromArgb(0, 0, 0, 0); // 0 olacak hepsi
 
@@ -72,7 +83,7 @@ namespace EDVRHUD
 
         public static string EDJournalPath { get; private set; }
         private static FileSystemWatcher EDLogWatcher;
-        private FileSystemWatcher EDStatusWatcher;
+        //private FileSystemWatcher EDStatusWatcher;
         //private Thread EDJournalReplayThread;
         //public static bool ReplayNextSystem = false;
 
@@ -131,28 +142,6 @@ namespace EDVRHUD
             LoadPanels(null, null);
             ReplayForm.Show();
             ReplayForm.Focus();
-
-            ////select file
-            //string[] filenames = new string[0];
-            //using (var ofd = new OpenFileDialog())
-            //{
-            //    ofd.Multiselect = true;
-            //    ofd.InitialDirectory = EDJournalPath;
-            //    ofd.Filter = "Elite Dangerous Journal|Journal.????????????.??.log";
-            //    ofd.Title = "Please select one or more journals to replay";
-            //    ofd.DefaultExt = ".log";
-            //    if (ofd.ShowDialog() == DialogResult.OK)
-            //    {
-            //        filenames = ofd.FileNames.OrderBy(f => f).ToArray();
-            //    }
-            //}
-
-            //if (filenames.Length == 0)
-            //    return;
-
-            //EDLogWatcher.EnableRaisingEvents = false;
-            //ReplayMenu.Enabled = false;
-
         }
 
         public static SettingsForm SettingsForm { get; set; } = null;
@@ -203,6 +192,37 @@ namespace EDVRHUD
                     Settings.Voice = voice.VoiceInfo.Name;
             }
             ApplySettings();
+            LoadBindings();
+        }
+
+        private static void LoadBindings()
+        {
+            var bindingsPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            bindingsPath = Path.Combine(bindingsPath, "Frontier Developments", "Elite Dangerous", "Options", "Bindings");
+            var bindingsFile = Directory.EnumerateFiles(bindingsPath, "Custom.?.?.binds").OrderByDescending(f => f).FirstOrDefault();
+            try
+            {
+                var bindings = File.ReadAllText(bindingsFile);
+                var doc = new XmlDocument();
+                doc.LoadXml(bindings);
+                EDBindings = doc.DocumentElement;
+                //var upNode = doc.DocumentElement.SelectSingleNode("UI_Up/Primary"); //upNode.Attributes["Device"].Value upNode.Attributes["Key"].Value
+                //var downNode = doc.DocumentElement.SelectSingleNode("UI_Down/Primary");
+                //var leftNode = doc.DocumentElement.SelectSingleNode("UI_Left/Primary");
+                //var rightNode = doc.DocumentElement.SelectSingleNode("UI_Right/5Primary");
+            }
+            catch
+            {
+                EDBindings = null;
+            }
+        }
+
+        public static string GetBinding(string binding, string key = "Primary")
+        {
+            if (EDBindings == null)
+                return null;
+            var elem = EDBindings.SelectSingleNode("\\binding\\" + key);
+            return elem?.Value;
         }
 
         private static void ApplySettings()
@@ -264,7 +284,6 @@ namespace EDVRHUD
         {
             TrayIcon.Visible = false;
             AppRunning = false;
-            Application.Exit();
         }
 
         private HmdMatrix34_t DefaultOverlayPosition = new HmdMatrix34_t()
@@ -285,8 +304,21 @@ namespace EDVRHUD
 
         public void Run()
         {
-            EDJournalPath = GetSavedGamesPath() + "\\Frontier Developments\\Elite Dangerous";
+            EDJournalPath = Path.Combine(GetSavedGamesPath(), "Frontier Developments", "Elite Dangerous");
             LoadSettings();
+
+
+            EDCommon.DB = new LiteDatabase("EDVRHUD.db");
+            EDCommon.DBJournal = EDCommon.DB.GetCollection<Dictionary<string, object>>("Journal");
+            EDCommon.DBSettings = EDCommon.DB.GetCollection<Dictionary<string, object>>("Settings");
+            RebuildDB();
+
+            //var reults = EDCommon.DBColl.Query()
+            //    .Where(x => x["Radius"] != null && x["PlanetType"] != null)
+            //    .OrderBy(x => x["Radius"])
+            //    //.Select(x => new { BodyName=x["BodyName"], Radius=x["Radius"]})                
+            //    .ToList();
+
             GetCommander();
             if (Settings.VoiceEnable)
                 Speech.Speak("Welcome Commander " + CommanderName + ".");
@@ -338,13 +370,12 @@ namespace EDVRHUD
 
                         LoadPanels(null, null);
 
-                        EDStatusWatcher = new FileSystemWatcher(EDJournalPath, "Status.json")
-                        {
-                            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
-                        };
-                        EDStatusWatcher.Changed += StatusChanged;
-                        EDStatusWatcher.Created += StatusChanged;
-                        EDStatusWatcher.EnableRaisingEvents = true;
+                        //EDStatusWatcher = new FileSystemWatcher(EDJournalPath, "Status.json")
+                        //{
+                        //    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
+                        //};
+                        //EDStatusWatcher.Changed += StatusChanged;
+                        //EDStatusWatcher.EnableRaisingEvents = true;
                         ReadStatus();
 
                         StartJournalListening();
@@ -358,6 +389,11 @@ namespace EDVRHUD
                                     if (string.IsNullOrEmpty(CachedContent))
                                         InitialLoad = false;
                                 }
+                            }
+                            else if (ReplayForm == null)
+                            {
+                                ReadStatus();
+                                ReadJournal();
                             }
 
                             bool intersect = false;
@@ -436,8 +472,18 @@ namespace EDVRHUD
                                             if (string.IsNullOrEmpty(eventtype))
                                                 continue;
 
-                                            foreach (var p in HudPanels)
-                                                p.JournalUpdate(eventtype, entry);
+                                            var isReplay = entry.GetProperty("IsReplay", false);
+
+                                            //foreach (var p in HudPanels)
+                                            //    p.OnJournalUpdate(eventtype, entry);
+                                            HudPanel.JournalUpdate(eventtype, entry, HudPanels);
+
+                                            //isreplay is used for scans
+                                            if (!isReplay)
+                                            {
+                                                var id = new BsonValue(EDCommon.DBIDForEntry(ts, eventtype, entry).ToByteArray());
+                                                EDCommon.DBJournal.Upsert(id, entry);
+                                            }
                                         }
                                     }
                                 }
@@ -458,6 +504,8 @@ namespace EDVRHUD
 
                             foreach (var p in HudPanels)
                             {
+                                p.RedrawIfNeeded();
+
                                 if (sendStatusFocus)
                                 {
                                     p.EDStatusChanged(EDFlags, GUIFocus);
@@ -491,9 +539,9 @@ namespace EDVRHUD
                             ReplayForm = null;
                         }
 
-                        EDStatusWatcher.EnableRaisingEvents = false;
-                        EDStatusWatcher.Dispose();
-                        EDStatusWatcher = null;
+                        //EDStatusWatcher.EnableRaisingEvents = false;
+                        //EDStatusWatcher.Dispose();
+                        //EDStatusWatcher = null;
 
                         foreach (var p in HudPanels)
                             p.Dispose();
@@ -506,9 +554,118 @@ namespace EDVRHUD
 
                 EDFont.Dispose();
             }
+
+            if (CurrentStream != null)
+                CurrentStream.Dispose();
+            CurrentStream = null;
+
             Shutup();
             Talk("Farewell Commander " + CommanderName + ".", false);
             Speech.Dispose();
+
+            EDCommon.DB.Dispose();
+        }
+
+        private void RebuildDB()
+        {
+            EDCommon.DBJournal.EnsureIndex("SystemAddress");
+            EDCommon.DBJournal.EnsureIndex("event");
+            EDCommon.DBJournal.EnsureIndex("timestamp");
+
+            var settings = EDCommon.DBSettings.Query().FirstOrDefault() ?? new Dictionary<string, object>();
+            var lastJournalFile = settings?.GetProperty("LastJournalFile", "");
+
+            //var reults = EDCommon.DBColl.Query()
+            //    .Where(x => x["Radius"] != null && x["PlanetType"] != null)
+            //    .OrderBy(x => x["Radius"])
+            //    //.Select(x => new { BodyName=x["BodyName"], Radius=x["Radius"]})                
+            //    .ToList();
+
+
+            //read all logs and write to db                
+            var logs = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderBy(f => f);
+            if (string.IsNullOrEmpty(lastJournalFile))
+                TrayIcon.ShowBalloonTip(2000, "Importing journals", "Total of " + logs.Count() + " logs found.", ToolTipIcon.Info);
+            var lastTs = DateTime.MinValue;
+            var lastLog = "";
+            foreach (var log in logs)
+            {
+                Application.DoEvents();
+                if (log.CompareTo(lastJournalFile) < 0)
+                    continue;
+                lastLog = log;
+                using (var fs = File.Open(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    EDCommon.DB.BeginTrans();
+                    var bytes = new byte[fs.Length];
+                    fs.Read(bytes, 0, bytes.Length);
+                    fs.Close();
+                    var strcontent = Encoding.UTF8.GetString(bytes);
+                    var lines = strcontent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                    foreach (var line in lines)
+                    {
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        var entry = Serializer.Deserialize<Dictionary<string, object>>(line);
+                        if (!entry.GetProperty("timestamp", "", out var timestamp))
+                            continue;
+
+                        if (!DateTime.TryParse(timestamp.ToString(), out var ts))
+                            continue;
+
+                        ts = ts.ToUniversalTime();
+
+                        var eventtype = entry.GetProperty("event", "");
+                        if (string.IsNullOrEmpty(eventtype))
+                            continue;
+
+
+                        var id = new BsonValue(EDCommon.DBIDForEntry(ts, eventtype, entry).ToByteArray());
+                        EDCommon.DBJournal.Upsert(id, entry);
+                    }
+                    EDCommon.DB.Commit();
+                }
+            }
+
+            settings["LastJournalFile"] = lastLog;            
+            EDCommon.DBSettings.Upsert(new BsonValue(new ObjectId(0, 0, 0, 0).ToByteArray()), settings); //single item in coll
+        }
+
+        public static void ReplayScans(long systemAddress)
+        {
+            var scans = new Dictionary<string, Dictionary<string, object>>();
+            var scansResult = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("SystemAddress", new BsonValue(systemAddress)), LiteDB.Query.EQ("event", "Scan")));
+            foreach (var scan in scansResult)
+            {
+                var bodyName = scan.GetProperty("BodyName", "");
+                if (string.IsNullOrEmpty(bodyName))
+                    continue;                
+                scans[bodyName] = scan;
+                scan["WasDiscovered"] = true;
+            }
+
+            var mapResult = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("SystemAddress", new BsonValue(systemAddress)), LiteDB.Query.EQ("event", "SAAScanComplete")));
+            foreach (var scan in mapResult)
+            {
+                var bodyName = scan.GetProperty("BodyName", "");
+                if (string.IsNullOrEmpty(bodyName))
+                    continue;
+                scans.TryGetValue(bodyName, out var s);
+                if (s == null)
+                    continue;
+                s["WasMapped"] = true;
+            }
+
+
+            var sb = new StringBuilder();
+            foreach (var item in scans)
+            {
+                item.Value.Remove("_id");
+                item.Value["IsReplay"] = true;                
+                item.Value["timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+                sb.AppendLine(Serializer.Serialize(item.Value));
+            }
+            lock (ContentLock)
+                CachedContent += sb.ToString();
         }
 
         private static void StopJournalListening()
@@ -523,104 +680,121 @@ namespace EDVRHUD
 
         private static void StartJournalListening()
         {
-            LastJournalFile = "";
+            CurrentJournalFile = "";
             LastJournalPosition = 0;
             LastJournalTimeStamp = DateTime.MinValue;
             PrevGUIFocus = GUIFocus.Initial;
             PrevEDFlags = StatusFlags.Initial;
 
+            InitialLoad = true;
+
+            var startId = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("event", "StartJump"), LiteDB.Query.EQ("JumpType", "Hyperspace")))
+                .OrderByDescending(x => x["timestamp"])
+                .Select(x => x["timestamp"])
+                .FirstOrDefault();
+
+            var latestEntries = EDCommon.DBJournal.Find(LiteDB.Query.GTE("timestamp", new BsonValue(startId)));
+
+            var sb = new StringBuilder();
+            foreach (var entry in latestEntries)
+            {
+                entry.Remove("_id");                
+                sb.AppendLine(Serializer.Serialize(entry));
+            }
+            CachedContent = sb.ToString();
+            //load from db
+            //load last FSDJump 
+            //var skippedFiles = new List<string>();
+            //var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
+            //var jumpFound = false;
+
+            //while (true)
+            //{
+
+            //    var currFile = CurrentJournalFile = files[0];
+            //    files.RemoveAt(0);
+
+            //    LastJournalPosition = 0;
+            //    LastJournalTimeStamp = DateTime.MinValue;
+            //    ReadJournal();
+            //    lock (ContentLock)
+            //    {
+            //        var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+            //        CachedContent = "";
+            //        for (var i = lines.Length; i > 0; i--)
+            //        {
+            //            var line = lines[i - 1];
+            //            if (string.IsNullOrEmpty(line))
+            //                continue;
+            //            CachedContent = line + Environment.NewLine + CachedContent;
+            //            if (line.Contains("\"event\":\"StartJump\", \"JumpType\":\"Hyperspace\""))
+            //            {
+            //                jumpFound = true;
+            //                break;
+            //            }
+            //        }
+            //    }
+            //    if (jumpFound)
+            //    {
+            //        if (skippedFiles.Count > 0)
+            //        {
+            //            files = skippedFiles;
+            //        }
+            //        else
+            //            break;
+            //    }
+            //    else
+            //    {
+            //        lock (ContentLock)
+            //            CachedContent = "";
+            //        skippedFiles.Add(currFile);
+            //    }
+            //}
+
 
             EDLogWatcher = new FileSystemWatcher(EDJournalPath, "Journal.????????????.??.log")
             {
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
+                NotifyFilter = NotifyFilters.FileName
             };
-            EDLogWatcher.Changed += JournalChanged;
+
+            //EDLogWatcher.Changed += JournalChanged;
             EDLogWatcher.Created += JournalChanged;
 
-            InitialLoad = true;
-
-            //load last FSDJump 
-            var skippedFiles = new List<string>();
-            var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
-            var jumpFound = false;
-
-            while (true)
-            {
-                LastJournalFile = files[0];
-                files.RemoveAt(0);
-
-                LastJournalPosition = 0;
-                LastJournalTimeStamp = DateTime.MinValue;
-                ReadJournal();
-                lock (ContentLock)
-                {
-                    var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                    CachedContent = "";
-                    for (var i = lines.Length; i > 0; i--)
-                    {
-                        var line = lines[i - 1];
-                        if (string.IsNullOrEmpty(line))
-                            continue;
-                        CachedContent = line + Environment.NewLine + CachedContent;
-                        if (line.Contains("\"event\":\"StartJump\", \"JumpType\":\"Hyperspace\""))
-                        {
-                            jumpFound = true;
-                            break;
-                        }
-                    }
-                }
-                if (jumpFound)
-                {
-                    if (skippedFiles.Count > 0)
-                    {
-                        files = skippedFiles;
-                    }
-                    else
-                        break;
-                }
-                else
-                {
-                    lock (ContentLock)
-                        CachedContent = "";
-                    skippedFiles.Add(LastJournalFile);
-                }
-            }
             EDLogWatcher.EnableRaisingEvents = true;
+            //ReadJournal();
         }
 
-        private static string LastJournalFile { get; set; }
-        private static long LastJournalPosition { get; set; }
+        private static string NewJournalFile { get; set; }
+        private static string CurrentJournalFile { get; set; }
+        private static FileStream CurrentStream { get; set; }
+
         public static DateTime LastJournalTimeStamp { get; set; } = DateTime.MinValue;
+        private static long LastJournalPosition { get; set; }
         internal static string CachedContent { get; set; }
         internal static object ContentLock = new object();
 
-        private static GUIFocus GUIFocus = GUIFocus.None;
-        private static GUIFocus PrevGUIFocus = GUIFocus.Initial;
+        public static GUIFocus GUIFocus { get; private set; } = GUIFocus.None;
+        public static GUIFocus PrevGUIFocus { get; private set; } = GUIFocus.Initial;
 
-        private static StatusFlags EDFlags = StatusFlags.None;
-        private static StatusFlags PrevEDFlags = StatusFlags.Initial;
+        public static StatusFlags EDFlags { get; private set; } = StatusFlags.None;
+        public static StatusFlags PrevEDFlags { get; private set; } = StatusFlags.Initial;
 
-        private void StatusChanged(object sender, FileSystemEventArgs e)
-        {
-            if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
-            {
-                //Debug.WriteLine("Status file changed.");
-                ReadStatus();
-            }
-        }
+        //private void StatusChanged(object sender, FileSystemEventArgs e)
+        //{
+        //    if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
+        //    {
+        //        //Debug.WriteLine("Status file changed.");
+
+        //    }
+        //}
 
         private static void JournalChanged(object sender, FileSystemEventArgs e)
         {
-            if (e.ChangeType == WatcherChangeTypes.Changed || e.ChangeType == WatcherChangeTypes.Created)
+            if (e.ChangeType == WatcherChangeTypes.Created)
             {
-                if (LastJournalFile != e.FullPath)
-                {
-                    LastJournalPosition = 0;
-                    LastJournalFile = e.FullPath;
-                    lock (ContentLock)
-                        CachedContent = "";
-                }
-                ReadJournal();
+                NewJournalFile = e.FullPath;
+                //CurrentJournalFile = e.FullPath;
+                //ReadJournal();
             }
         }
 
@@ -630,9 +804,13 @@ namespace EDVRHUD
             {
                 using (var fs = File.Open(EDJournalPath + "\\Status.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
-                    var bytes = new byte[fs.Length];
-                    fs.Read(bytes, 0, bytes.Length);
-                    fs.Close();
+                    byte[] bytes = null;
+                    if (fs.Length >= 0)
+                    {
+                        bytes = new byte[fs.Length];
+                        fs.Read(bytes, 0, bytes.Length);
+                        fs.Close();
+                    }
                     var strcontent = Encoding.UTF8.GetString(bytes);
                     if (string.IsNullOrWhiteSpace(strcontent))
                         return;
@@ -641,7 +819,7 @@ namespace EDVRHUD
                     EDFlags = (StatusFlags)status.GetProperty("Flags", 0L);
                     //if (EDFlags == StatusFlags.None)
                     //    return;
-                    Debug.WriteLine("GUIFocus: " + GUIFocus + " ED Status: " + EDFlags.ToString());
+                    //Debug.WriteLine("GUIFocus: " + GUIFocus + " ED Status: " + EDFlags.ToString());
                 }
             }
             catch
@@ -654,17 +832,34 @@ namespace EDVRHUD
         {
             try
             {
-                using (var fs = File.Open(LastJournalFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                if (!string.IsNullOrEmpty(CurrentJournalFile))
                 {
-                    fs.Seek(LastJournalPosition, SeekOrigin.Begin);
-                    var len = fs.Length;
-                    var bytes = new byte[len - fs.Position];
-                    fs.Read(bytes, 0, bytes.Length);
-                    fs.Close();
+                    if (CurrentStream != null)
+                        CurrentStream.Dispose();
+                    CurrentStream = File.Open(CurrentJournalFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    CurrentStream.Seek(0, SeekOrigin.Begin);
+                    CurrentJournalFile = null;
+                    LastJournalPosition = 0;
+                }
+
+                if (CurrentStream != null)
+                {
+                    if (CurrentStream.Length == LastJournalPosition)
+                        return;
+                    var len = CurrentStream.Length;
+                    var bytes = new byte[len - CurrentStream.Position];
+                    CurrentStream.Read(bytes, 0, bytes.Length);
                     LastJournalPosition = len;
                     var strcontent = Encoding.UTF8.GetString(bytes);
                     lock (ContentLock)
                         CachedContent += strcontent;
+                }
+                if (!string.IsNullOrEmpty(NewJournalFile))
+                {
+                    CurrentJournalFile = NewJournalFile;
+                    NewJournalFile = null;
+                    CurrentStream.Dispose();
+                    CurrentStream = null;
                 }
             }
             catch
@@ -675,33 +870,48 @@ namespace EDVRHUD
 
         private static void GetCommander()
         {
-            var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
-            if (files.Count > 0)
-            {
-                var filename = files[0];
-                string strcontent = "";
-                using (var fs = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                {
-                    fs.Seek(0, SeekOrigin.Begin);
-                    var len = fs.Length;
-                    var bytes = new byte[len];
-                    fs.Read(bytes, 0, bytes.Length);
-                    fs.Close();
-                    strcontent = Encoding.UTF8.GetString(bytes);
-                }
+            //var reults = EDCommon.DBColl.Query()
+            //    .Where(x => x["Radius"] != null && x["PlanetType"] != null)
+            //    .OrderBy(x => x["Radius"])
+            //    //.Select(x => new { BodyName=x["BodyName"], Radius=x["Radius"]})                
+            //    .ToList();
 
-                var lines = strcontent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                //get name
-                for (var i = 0; i < lines.Length; i++)
-                {
-                    var json = Serializer.Deserialize<Dictionary<string, object>>(lines[i]);
-                    if (json.GetProperty("event", "") == "Commander")
-                    {
-                        CommanderName = json.GetProperty("Name", "Unknown");
-                        return;
-                    }
-                }
-            }
+            var result = EDCommon.DBJournal.Query()
+                .Where(x => x["Commander"] != null)
+                .OrderByDescending(x => x["timestamp"])                   
+                .FirstOrDefault();
+
+            if (result != null)
+                CommanderName = result["Commander"].ToString();
+
+            //var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
+            //while (files.Count > 0)
+            //{
+            //    var filename = files[0];
+            //    string strcontent = "";
+            //    using (var fs = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            //    {
+            //        fs.Seek(0, SeekOrigin.Begin);
+            //        var len = fs.Length;
+            //        var bytes = new byte[len];
+            //        fs.Read(bytes, 0, bytes.Length);
+            //        fs.Close();
+            //        strcontent = Encoding.UTF8.GetString(bytes);
+            //    }
+
+            //    var lines = strcontent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+            //    //get name
+            //    for (var i = 0; i < lines.Length; i++)
+            //    {
+            //        var json = Serializer.Deserialize<Dictionary<string, object>>(lines[i]);
+            //        if (json.GetProperty("event", "") == "Commander")
+            //        {
+            //            CommanderName = json.GetProperty("Name", "Unknown");
+            //            return;
+            //        }
+            //    }
+            //    files.RemoveAt(0);
+            //}
         }
 
         public static string GetSavedGamesPath()

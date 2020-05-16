@@ -41,6 +41,11 @@ namespace EDVRHUD
                     return Assembly.Load(Properties.Resources.SharpDX_Direct3D11);
                 case "SharpDX.DXGI":
                     return Assembly.Load(Properties.Resources.SharpDX_DXGI);
+                case "LiteDB":
+                   return Assembly.Load(Properties.Resources.LiteDB);
+                case "WindowsInput":
+                    return Assembly.Load(Properties.Resources.WindowsInput);
+                    
             }
             return ass;
         }

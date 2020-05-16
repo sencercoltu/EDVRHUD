@@ -30,3 +30,6 @@ _ReSharper*/
 .vs/
 #Nuget packages folder
 packages/
+/EDVRHUD Release.lnk
+/EDVRHUD.db
+/openvr_api.dll

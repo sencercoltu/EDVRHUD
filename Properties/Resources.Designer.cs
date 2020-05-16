@@ -163,6 +163,16 @@ namespace EDVRHUD.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] LiteDB {
+            get {
+                object obj = ResourceManager.GetObject("LiteDB", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] openvr_api {
             get {
                 object obj = ResourceManager.GetObject("openvr_api", resourceCulture);
@@ -287,6 +297,16 @@ namespace EDVRHUD.Properties {
             get {
                 object obj = ResourceManager.GetObject("Star", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] WindowsInput {
+            get {
+                object obj = ResourceManager.GetObject("WindowsInput", resourceCulture);
+                return ((byte[])(obj));
             }
         }
     }

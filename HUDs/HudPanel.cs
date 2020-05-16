@@ -4,12 +4,15 @@ using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Channels;
+using System.Threading;
 using System.Windows.Forms;
 using Valve.VR;
 
@@ -447,7 +450,7 @@ namespace EDVRHUD
                         OpenVR.Overlay.SetOverlayAlpha(OverlayHandle, CurrentAlpha);
                         return true;
                     }
-                    Debug.WriteLine(Name + " intersect.");
+                    //Debug.WriteLine(Name + " intersect.");
                 }
                 else
                 {
@@ -474,16 +477,118 @@ namespace EDVRHUD
 
         public int PanelUpdated { get; set; } = 0;
 
-        public abstract void JournalUpdate(string eventType, Dictionary<string, object> entry);
+        public static Dictionary<string, object> EDSMSystemInfo { get; private set; } = new Dictionary<string, object>();
+        public static Dictionary<string, object>[] EDSMNearbySystems { get; private set; } = new Dictionary<string, object>[0];
 
-        protected abstract void Redraw();
+
+        public static void JournalUpdate(string eventType, Dictionary<string, object> entry, IEnumerable<HudPanel> panelList)
+        {
+            var replay = entry.GetProperty("IsReplay", false);
+            switch (eventType)
+            {
+                case "StartJump":
+                    //started jumping
+                    {
+                        if (NotificationApp.Settings.EDSMDestinationSystem && entry.GetProperty("JumpType", "") == "Hyperspace")
+                        {
+
+                            EDSMSystemInfo.Clear();
+                            var systemAddress = entry.GetProperty("SystemAddress", 0UL);
+                            if (systemAddress != 0)
+                            {
+                                EDCommon.RequestEDSMSystemInfo(systemAddress, d =>
+                                {
+                                    EDSMSystemInfo = d;
+                                    if (d.Count > 0)
+                                    {
+                                        var commander = "an unknown commander";
+                                        var bodies = d.GetProperty("bodies", null as ArrayList);
+                                        if (bodies != null)
+                                        {
+                                            if (bodies.Count > 0 && (bodies[0] as IDictionary<string, object>).GetProperty("discovery", null as IDictionary<string, object>, out var disco))
+                                            {
+                                                var c = disco.GetProperty("commander", "");
+                                                if (!string.IsNullOrWhiteSpace(c))
+                                                    commander = "commander " + c;
+                                            }
+                                            NotificationApp.Talk("Destination system was previously discovered by " + commander + ".");
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    break;
+
+                case "FSSDiscoveryScan":
+                    //end jump
+                    {
+                        if (NotificationApp.Settings.EDSMNearbySystems)
+                        {
+                            EDSMNearbySystems = new Dictionary<string, object>[0];
+                            var name = entry.GetProperty("SystemName", "");
+                            if (!string.IsNullOrEmpty(name))
+                            {
+                                EDCommon.RequestEDSMNearbySystems(name, d =>
+                                {
+                                    EDSMNearbySystems = d;
+                                    if (d.Length > 0)
+                                        NotificationApp.Talk("There are " + d.Length + " previously discovered systems nearby.");
+                                });
+                            }
+                        }
+                        break;
+                    }
+                case "FSDJump":
+                    {
+                        if (!replay)
+                        {
+                            var addr = entry.GetProperty("SystemAddress", 0L);
+                            NotificationApp.ReplayScans(addr);
+                        }
+                    }
+                    break;
+            }
+
+            foreach (var panel in panelList)
+            {
+                panel.OnJournalUpdate(eventType, entry);
+            }
+
+        }
+
+        public abstract void OnJournalUpdate(string eventType, Dictionary<string, object> entry);
+
+
+
+        protected abstract void OnRedrawPanel();
+
+        protected bool NeedsRedraw = false;
+
+        protected void Redraw()
+        {
+            NeedsRedraw = true;
+        }
+
+        public void RedrawIfNeeded()
+        {
+            if (!NeedsRedraw)
+                return;
+            NeedsRedraw = false;
+            OnRedrawPanel();
+        }
 
         internal void RefreshUpdate()
         {
             PanelUpdated = 2;
         }
 
-        internal virtual void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
+        internal void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)
+        {
+            OnEDStatusChanged(status, guiFocus);
+        }
+
+        internal virtual void OnEDStatusChanged(StatusFlags status, GUIFocus guiFocus)
         {
 
         }

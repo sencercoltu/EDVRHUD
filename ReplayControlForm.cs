@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LiteDB;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -9,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace EDVRHUD
@@ -22,43 +24,26 @@ namespace EDVRHUD
 
         private void tbRate_ValueChanged(object sender, EventArgs e)
         {
-            ReplayRate = (1 + (100 - tbRate.Value)) * 10;
-            lblRate.Text = "X" + tbRate.Value;
-        }
-
-        private List<string> Journals = new List<string>();
-
-        private void btnFiles_Click(object sender, EventArgs e)
-        {
-            using (var ofd = new OpenFileDialog())
-            {
-                ofd.Multiselect = true;
-                ofd.InitialDirectory = NotificationApp.EDJournalPath;
-                ofd.Filter = "Elite Dangerous Journal|Journal.????????????.??.log";
-                ofd.Title = "Please select one or more journals to replay";
-                ofd.DefaultExt = ".log";
-                if (ofd.ShowDialog() == DialogResult.OK)
-                {
-                    Journals = ofd.FileNames.OrderBy(f => f).ToList();
-                }
-            }
-            btnStartStop.Enabled = Journals.Count > 0;
+            ReplayRate = (1000 - tbRate.Value) + 1;
+            lblRate.Text = tbRate.Value.ToString();
         }
 
         private Thread ReplayThread = null;
         private bool ReplayRunning = false;
-        private int ReplayRate = 1;
+        private int ReplayRate = 1000;
         private bool ReplayBreakOnFSDJump = false;
         private bool ReplayBreak = false;
 
+        private JavaScriptSerializer Serializer = new JavaScriptSerializer();
 
 
         private void btnStartStop_Click(object sender, EventArgs e)
         {
             if (ReplayThread == null)
-            {
+            {                
                 btnStartStop.Text = "Stop";
-                btnFiles.Enabled = false;
+                dtpStartDate.Enabled = false;
+                dtpStartTime.Enabled = false;
                 ReplayThread = new Thread(() =>
                 {
                     while (ReplayRunning)
@@ -67,15 +52,17 @@ namespace EDVRHUD
                             break;
                         Thread.Sleep(ReplayRate);
                     }
-                    ReplayRunning = false;
 
                     Invoke((Action)(() =>
-                    {
+                    {                        
                         btnStartStop.Text = "Start";
                         lblTimestamp.BackColor = Form.DefaultBackColor;
-                        btnFiles.Enabled = true;
-                        ReplayThread = null;
+                        dtpStartDate.Enabled = true;
+                        dtpStartTime.Enabled = true;                        
                     }));
+
+                    ReplayRunning = false;
+                    ReplayThread = null;
 
                 })
                 { IsBackground = true };
@@ -85,53 +72,57 @@ namespace EDVRHUD
             }
             else
             {
-                if (ReplayThread != null)
-                {
-                    ReplayRunning = false;
-                    ReplayThread = null;                    
-                }
+                ReplayRunning = false;                                      
             }
         }
 
-        private List<string> AllLines = new List<string>();        
+        //private List<string> AllLines = new List<string>();        
 
+        private IList<Dictionary<string, object>> ReplayEntries = new List<Dictionary<string, object>>();
+
+
+        private DateTime SimTime;        
         private bool ThreadTick()
         {
-            if (Journals.Count > 0)
+            if (!ReplayEntries.Any())
             {
-                AllLines.Clear();
-                foreach (var journal in Journals)
-                {
-                    using (var fs = File.Open(journal, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    {
-                        fs.Seek(0, SeekOrigin.Begin);
-                        var len = fs.Length;
-                        var bytes = new byte[len];
-                        fs.Read(bytes, 0, bytes.Length);
-                        fs.Close();
-                        var strcontent = Encoding.UTF8.GetString(bytes);
-                        var lines = strcontent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                        AllLines.AddRange(lines);
-                    }
-                }
-                Journals.Clear();
+                SimTime = dtpStartDate.Value.Date;
+                SimTime.Add(dtpStartTime.Value.TimeOfDay);
+                var simEndTime = SimTime.Date.AddDays(1).AddSeconds(-1);
+                var s = new BsonValue(SimTime.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+                var e = new BsonValue(simEndTime.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+                ReplayEntries = EDCommon.DBJournal.Find(LiteDB.Query.Between("timestamp", s, e)).ToList();
                 NotificationApp.LastJournalTimeStamp = DateTime.MinValue;
-
-
+                ReplayBreak = false;                
             }
 
-            if (AllLines.Count == 0)
+            if (!ReplayEntries.Any())
             {
                 return false;
             }
 
+
             //get line and 
-            var currLine = AllLines[0];
-            if (string.IsNullOrWhiteSpace(currLine))
+            var entry = ReplayEntries.First();
+
+
+            var ts = entry.GetProperty("timestamp", "");
+
+            if (!DateTime.TryParse(ts.ToString(), out var tsdt))
             {
-                AllLines.RemoveAt(0);
+                ReplayEntries.RemoveAt(0);
                 return true;
             }
+            tsdt = tsdt.ToUniversalTime();
+
+            Invoke((Action)(() => { lblTimestamp.Text = ts + "/" + ReplayEntries.Count; }));
+
+            entry.Remove("_id");
+            entry.Remove("SimTime");
+            entry["IsReplay"] = true;
+
+
+            var currLine = Serializer.Serialize(entry);
 
             if (!ReplayBreak && ReplayBreakOnFSDJump && currLine.Contains("\"event\":\"FSDJump\","))
             {
@@ -142,71 +133,39 @@ namespace EDVRHUD
                 ReplayBreak = false;
 
             //check timestamp
-            var tsstart = currLine.IndexOf("\"timestamp\":") + 13;
-            var ts = currLine.Substring(tsstart, 20);
-            Invoke((Action)(() => { lblTimestamp.Text = ts; }));
 
-            AllLines.RemoveAt(0);
+            ReplayEntries.RemoveAt(0);
 
             lock (NotificationApp.ContentLock)
                 NotificationApp.CachedContent += currLine + Environment.NewLine;
 
             return true;
-
-            //EDJournalReplayThread = new Thread(() =>
-            //{
-            //    //var usedEvents = new[] { "StarClass", "JetConeBoost", "StartJump", "FSDTarget", "FSDJump", "DiscoveryScan", "FSSSignalDiscovered", "FSSDiscoveryScan", "FSSAllBodiesFound", "Scan" };
-
-            //    lock (ContentLock)
-            //        CachedContent = "";
-            //    LastJournalTimeStamp = DateTime.MinValue;
-
-            //    foreach (var filename in filenames)
-            //    {
-            //        if (!AppRunning)
-            //            return;
-            //        var content = File.ReadAllText(filename);
-            //        var lines = content.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-            //        foreach (var line in lines)
-            //        {
-            //            if (string.IsNullOrEmpty(line))
-            //                continue;
-
-            //            //if (!usedEvents.Any(e => line.Contains("\"" + e + "\"")))
-            //            //    continue;
-            //            if (Settings.BreakOnFSDJump)
-            //            {
-            //                if (line.Contains("\"event\":\"FSDJump\","))
-            //                {
-            //                    while (true)
-            //                    {
-            //                        if (!AppRunning)
-            //                            return;
-            //                        if (ReplayNextSystem)
-            //                        {
-            //                            ReplayNextSystem = false;
-            //                            break;
-            //                        }
-            //                        Thread.Sleep(100);
-            //                    }
-            //                }
-            //            }
-            //            lock (ContentLock)
-            //                CachedContent += line + Environment.NewLine;
-            //            if (!AppRunning)
-            //                break;
-
-            //            Thread.Sleep((100 - Settings.JournalReplaySpeed + 1) * 10);
-            //        }
-            //    }
-            //})
-            //{ IsBackground = true };
-            //EDJournalReplayThread.Start();
         }
 
         private void chkAutoPause_CheckedChanged(object sender, EventArgs e)
         {
             ReplayBreakOnFSDJump = chkAutoPause.Checked;
+        }
+
+        private void dtpStartDate_ValueChanged(object sender, EventArgs e)
+        {
+            ReplayEntries.Clear();
+        }
+
+        private void dtpStartTime_ValueChanged(object sender, EventArgs e)
+        {
+            ReplayEntries.Clear();
+        }
+
+
+        private void ReplayControlForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            ReplayRunning = false;
+            if (ReplayThread != null)
+            {
+                ReplayThread.Abort();
+                ReplayThread = null;
+            }
         }
     }
 }

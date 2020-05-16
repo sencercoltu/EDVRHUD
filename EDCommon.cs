@@ -1,12 +1,20 @@
 ﻿using EDVRHUD.HUDs;
+using LiteDB;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Security.Permissions;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 
 namespace EDVRHUD
 {
@@ -15,38 +23,38 @@ namespace EDVRHUD
     {
         Initial = -1,
         None = 0,
-        Docked = 1, //(on a landing pad)
-        Landed = 2, //(on planet surface)
-        GearDown = 4, //Landing Gear Down
-        ShieldsUp = 8, // Shields Up
-        Supercruise = 16, // Supercruise
-        FlightAssistOff = 32,
-        HardpointsDeployed = 64,
-        InWing = 128,
-        LightsOn = 256,
-        CargoScoopDeployed = 512,
-        SilentRunning = 1024,
-        ScoopingFuel = 2048,
-        SrvHandbrake = 4096,
-        SrvTurret = 8192,
-        SrvUnderShip = 16384,
-        SrvDriveAssist = 32768,
-        FsdMassLocked = 65536,
-        FsdCharging = 131072,
-        FsdCooldown = 262144,
-        LowFuel = 524288, // ( < 25% )
-        OverHeating = 1048576, // ( > 100% )
-        HasLatLong = 2097152,
-        IsInDanger = 4194304,
-        BeingInterdicted = 8388608,
-        InMainShip = 16777216,
-        InFighter = 33554432,
-        InSRV = 67108864,
-        HudAnalysisMode = 134217728,
-        NightVision = 268435456,
-        AltitudeFromAverageRadius = 536870912,
-        FsdJump = 1073741824,
-        SrvHighBeam = 2147483648
+        Docked = 1 << 0, //(on a landing pad)
+        Landed = 1 << 1, //(on planet surface)
+        GearDown = 1 << 2, //Landing Gear Down
+        ShieldsUp = 1 << 3, // Shields Up
+        Supercruise = 1 << 4, // Supercruise
+        FlightAssistOff = 1 << 5,
+        HardpointsDeployed = 1 << 6,
+        InWing = 1 << 7,
+        LightsOn = 1 << 8,
+        CargoScoopDeployed = 1 << 9,
+        SilentRunning = 1 << 10,
+        ScoopingFuel = 1 << 11,
+        SrvHandbrake = 1 << 12,
+        SrvTurret = 1 << 13,
+        SrvUnderShip = 1 << 14,
+        SrvDriveAssist = 1 << 15,
+        FsdMassLocked = 1 << 16,
+        FsdCharging = 1 << 17,
+        FsdCooldown = 1 << 18,
+        LowFuel = 1 << 19, // ( < 25% )
+        OverHeating = 1 << 20, // ( > 100% )
+        HasLatLong = 1 << 21,
+        IsInDanger = 1 << 22,
+        BeingInterdicted = 1 << 23,
+        InMainShip = 1 << 24,
+        InFighter = 1 << 25,
+        InSRV = 1 << 26,
+        HudAnalysisMode = 1 << 27,
+        NightVision = 1 << 28,
+        AltitudeFromAverageRadius = 1 << 29,
+        FsdJump = 1 << 30,
+        SrvHighBeam = 1 << 31
     }
 
     internal enum GUIFocus
@@ -70,34 +78,34 @@ namespace EDVRHUD
     internal enum MaterialType
     {
         None = 0,
-        Antimony = 0b0000000000000000000000000001, //s
-        Arsenic = 0b0000000000000000000000000010, //s
-        Boron = 0b0000000000000000000000000100, //a
-        Cadmium = 0b0000000000000000000000001000, //s
-        Carbon = 0b0000000000000000000000010000, //s
-        Chromium = 0b0000000000000000000000100000, //s
-        Germanium = 0b0000000000000000000001000000, //s
-        Iron = 0b0000000000000000000010000000, //s
-        Lead = 0b0000000000000000000100000000, //a
-        Manganese = 0b0000000000000000001000000000, //s
-        Mercury = 0b0000000000000000010000000000, //s
-        Molybdenum = 0b0000000000000000100000000000, //s
-        Nickel = 0b0000000000000001000000000000, //s
-        Niobium = 0b0000000000000010000000000000, //s
-        Phosphorus = 0b0000000000000100000000000000, //s
-        Polonium = 0b0000000000001000000000000000, //s
-        Rhenium = 0b0000000000010000000000000000, //a
-        Ruthenium = 0b0000000000100000000000000000, //s
-        Selenium = 0b0000000001000000000000000000, //s
-        Sulphur = 0b0000000010000000000000000000, //s
-        Technetium = 0b0000000100000000000000000000, //s
-        Tellurium = 0b0000001000000000000000000000, //s
-        Tin = 0b0000010000000000000000000000, //s
-        Tungsten = 0b0000100000000000000000000000, //s
-        Vanadium = 0b0001000000000000000000000000, //s 
-        Yttrium = 0b0010000000000000000000000000, //s
-        Zinc = 0b0100000000000000000000000000, //s
-        Zirconium = 0b1000000000000000000000000000, //s
+        Antimony = 1 << 0, //s
+        Arsenic = 1 << 1, //s
+        Boron = 1 << 2, //a
+        Cadmium = 1 << 3, //s
+        Carbon = 1 << 4, //s
+        Chromium = 1 << 5, //s
+        Germanium = 1 << 6, //s
+        Iron = 1 << 7, //s
+        Lead = 1 << 8, //a
+        Manganese = 1 << 9, //s
+        Mercury = 1 << 10, //s
+        Molybdenum = 1 << 11, //s
+        Nickel = 1 << 12, //s
+        Niobium = 1 << 13, //s
+        Phosphorus = 1 << 14, //s
+        Polonium = 1 << 15, //s
+        Rhenium = 1 << 16, //a
+        Ruthenium = 1 << 17, //s
+        Selenium = 1 << 18, //s
+        Sulphur = 1 << 19, //s
+        Technetium = 1 << 20, //s
+        Tellurium = 1 << 21, //s
+        Tin = 1 << 22, //s
+        Tungsten = 1 << 23, //s
+        Vanadium = 1 << 24, //s 
+        Yttrium = 1 << 25, //s
+        Zinc = 1 << 26, //s
+        Zirconium = 1 << 27, //s
         All = 0b1111111111111111111111111111
     }
 
@@ -153,8 +161,9 @@ namespace EDVRHUD
 
     internal class Star
     {
-        public Star(string name, string variant, StarType starType, double k = 1200)
+        public Star(string name, string variant, StarType starType, bool scoopable = true, double k = 1200)
         {
+            Scoopable = scoopable;
             PlainName = name;
             Variant = variant;
             Type = starType;
@@ -164,7 +173,7 @@ namespace EDVRHUD
         public string TypeName { get { return (PlainName + " " + Variant).Trim(); } }
 
         public string PlainName { get; set; }
-
+        public bool Scoopable { get; private set; }
         public string Variant { get; set; }
         public double K { get; set; }
     }
@@ -173,13 +182,12 @@ namespace EDVRHUD
     {
         public string Name { get; set; }
         public double K { get; set; }
-        public double K_T { get; set; }
-
-        public Planet(string name, double k = 300, double kt = 93328)
+        public double TerraformableBonus { get; set; }
+        public Planet(string name, double k = 300, double terraformableBonus = 93328)
         {
             Name = name;
             K = k;
-            K_T = kt;
+            TerraformableBonus = terraformableBonus;
         }
 
     }
@@ -187,6 +195,84 @@ namespace EDVRHUD
 
     internal static class EDCommon
     {
+        public static LiteDatabase DB { get; set; } = null;
+        public static ILiteCollection<Dictionary<string, object>> DBJournal { get; set; }
+        public static ILiteCollection<Dictionary<string, object>> DBSettings { get; set; }
+        //public static int DBSequence = DateTime.Now.Millisecond;
+        public static DateTime DBEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        public static ObjectId DBIDForEntry(DateTime ts, string eventtype, Dictionary<string, object> entry)
+        {
+            int hashCode;
+            switch (eventtype)
+            {
+                case "Scan":
+                    hashCode = (eventtype + "#" + entry.GetProperty("BodyName", "NoName")).GetHashCode();
+                    break;
+                case "JetConeDamage":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Module", "")).GetHashCode();
+                    break;
+                case "ReceiveText":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Message", "")).GetHashCode();
+                    break;
+                case "ShipTargeted":
+                    hashCode = (eventtype + "#" + entry.GetProperty("ScanStage", 0) + "#" + entry.GetProperty("Ship", "") + "#" + entry.GetProperty("PilotName", "")).GetHashCode();
+                    break;
+                case "MaterialCollected":
+                case "FSDTarget":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Name", "")).GetHashCode();
+                    break;
+                case "UnderAttack":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Target", "")).GetHashCode();
+                    break;
+                case "Music":
+                    hashCode = (eventtype + "#" + entry.GetProperty("MusicTrack", "")).GetHashCode();
+                    break;
+                case "FSSSignalDiscovered":
+                    hashCode = (eventtype + "#" + entry.GetProperty("SignalName", "")).GetHashCode();
+                    break;
+                case "USSDrop":
+                    hashCode = (eventtype + "#" + entry.GetProperty("USSType", "")).GetHashCode();
+                    break;
+                case "FuelScoop":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Total", 0.0)).GetHashCode();
+                    break;
+                case "HullDamage":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Health", 0.0)).GetHashCode();
+                    break;
+                case "CodexEntry":
+                    hashCode = (eventtype + "#" + entry.GetProperty("EntryID", 0)).GetHashCode();
+                    break;
+                case "NpcCrewPaidWage":
+                case "RedeemVoucher":
+                    hashCode = (eventtype + "#" + entry.GetProperty("Amount", 0)).GetHashCode();
+                    break;
+                default:
+                    hashCode = eventtype.GetHashCode();
+                    break;
+            }
+            return new ObjectId((int)((ts - DBEpoch).TotalSeconds), hashCode, 0, 0);
+        }
+
+        //[DllImport("user32.dll", SetLastError = true)]
+        //private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        //[DllImport("user32.dll")]
+        //private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+
+        //private static IntPtr _edWindowHandle = IntPtr.Zero;
+        //public static IntPtr GetEDWindowHandle
+        //{
+        //    get
+        //    {
+        //        if (_edWindowHandle == IntPtr.Zero)
+        //            _edWindowHandle = FindWindow("FrontierDevelopmentsAppWinClass", "Elite - Dangerous (CLIENT)");
+        //        return _edWindowHandle;
+        //    }
+        //}
+
+
         private static bool GetPropertyInternal<T>(IDictionary<string, object> dict, string key, T defaultValue, out T result)
         {
             if (dict == null)
@@ -257,7 +343,7 @@ namespace EDVRHUD
                 if (PlanetLookup.TryGetValue(body.BodyType, out var p))
                 {
                     k = p.K;
-                    if (body.Terraformable) k += p.K_T;
+                    if (body.Terraformable) k += p.TerraformableBonus;
                 }
 
                 double effmapped = 1.25;
@@ -279,6 +365,113 @@ namespace EDVRHUD
                     body.Value = basevalue; //Base
 
             }
+        }
+
+        private static Thread EDSMSystemRequestThread = null;
+        private static Thread EDSMNearbySystemsThread = null;
+
+        internal static void RequestEDSMNearbySystems(string systemName, Action<Dictionary<string, object>[]> newarbySystemsCallback)
+        {
+            if (EDSMNearbySystemsThread != null)
+            {
+                try
+                {
+                    EDSMNearbySystemsThread.Abort();
+                }
+                catch
+                {
+
+                }
+                EDSMNearbySystemsThread = null;
+            }
+
+            EDSMNearbySystemsThread = new Thread(() =>
+            {
+                try
+                {
+                    HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://www.edsm.net/api-v1/sphere-systems?showPrimaryStar=1&radius=100&systemName=" + systemName);
+                    request.Method = "GET";
+                    request.Headers.Add("Accept-Encoding", "gzip,deflate");
+                    request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                    request.Timeout = 10000;
+                    request.ContentType = "application/json; charset=utf-8";
+
+                    HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+
+                    if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        string data = "";
+                        var dataStream = response.GetResponseStream();
+                        var reader = new StreamReader(dataStream);
+                        data = reader.ReadToEnd();
+                        reader.Close();
+                        dataStream.Close();
+
+                        var serializer = new JavaScriptSerializer();
+                        var dict = serializer.Deserialize<Dictionary<string, object>[]>(data);
+                        newarbySystemsCallback?.Invoke(dict);
+                    }
+                }
+                catch
+                {
+
+                }
+                EDSMNearbySystemsThread = null;
+            })
+            { IsBackground = true };
+            EDSMNearbySystemsThread.Start();
+        }
+
+        internal static void RequestEDSMSystemInfo(ulong systemAddress, Action<Dictionary<string, object>> systemInfoCallback)
+        {
+            if (EDSMSystemRequestThread != null)
+            {
+                try
+                {
+                    EDSMSystemRequestThread.Abort();
+                }
+                catch
+                {
+
+                }
+                EDSMSystemRequestThread = null;
+            }
+
+            EDSMSystemRequestThread = new Thread(() =>
+            {
+                try
+                {
+                    HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://www.edsm.net/api-system-v1/bodies?systemId64=" + systemAddress);
+                    request.Method = "GET";
+                    request.Headers.Add("Accept-Encoding", "gzip,deflate");
+                    request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                    request.Timeout = 5000;
+                    request.ContentType = "application/json; charset=utf-8";
+
+                    HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+
+                    if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        string data = "";
+                        var dataStream = response.GetResponseStream();
+                        var reader = new StreamReader(dataStream);
+                        data = reader.ReadToEnd();
+                        reader.Close();
+                        dataStream.Close();
+
+                        var serializer = new JavaScriptSerializer();
+                        var dict = serializer.Deserialize<Dictionary<string, object>>(data);
+                        systemInfoCallback?.Invoke(dict);
+                    }
+                }
+                catch
+                {
+
+                }
+                EDSMSystemRequestThread = null;
+            })
+            { IsBackground = true };
+            EDSMSystemRequestThread.Start();
         }
 
         public static readonly Dictionary<string, Planet> PlanetLookup = new Dictionary<string, Planet>
@@ -320,43 +513,43 @@ namespace EDVRHUD
             ["M"] = new Star("Red Dwarf", "M", StarType.Safe),
             ["M_RedGiant"] = new Star("Red Giant", "M", StarType.Safe),
             ["M_RedSuperGiant"] = new Star("Red Super Giant", "M", StarType.Safe),
-            ["L"] = new Star("Brown Dwarf", "L", StarType.Safe),
-            ["T"] = new Star("Brown Dwarf", "T", StarType.Safe),
-            ["Y"] = new Star("Brown Dwarf", "Y", StarType.Safe),
-            ["TTS"] = new Star("T Tauri", "", StarType.Safe),
-            ["AeBe"] = new Star("Herbig Ae/Be", "", StarType.Safe),
-            ["W"] = new Star("Wolf-Rayet", "W", StarType.Safe),
-            ["WN"] = new Star("Wolf-Rayet", "WN", StarType.Safe),
-            ["WNC"] = new Star("Wolf-Rayet", "WNC", StarType.Safe),
-            ["WC"] = new Star("Wolf-Rayet", "WC", StarType.Safe),
-            ["WO"] = new Star("Wolf-Rayet", "WO", StarType.Safe),
-            ["CS"] = new Star("Carbon Star", "WCS", StarType.Safe),
-            ["C"] = new Star("Carbon Star", "C", StarType.Safe),
-            ["CN"] = new Star("Carbon Star", "CN", StarType.Safe),
-            ["CJ"] = new Star("Carbon Star", "CJ", StarType.Safe),
-            ["CH"] = new Star("Carbon Star", "CH", StarType.Safe),
-            ["CHd"] = new Star("Carbon Star", "CHd", StarType.Safe),
-            ["MS"] = new Star("Carbon Star", "MS", StarType.Safe),
-            ["S"] = new Star("Carbon Star", "S", StarType.Safe),
-            ["D"] = new Star("White Dwarf", "D", StarType.Dangerous, 14057),
-            ["DA"] = new Star("White Dwarf", "DA", StarType.Dangerous, 14057),
-            ["DAB"] = new Star("White Dwarf", "DAB", StarType.Dangerous, 14057),
-            ["DAO"] = new Star("White Dwarf", "DAO", StarType.Dangerous, 14057),
-            ["DAZ"] = new Star("White Dwarf", "DAZ", StarType.Dangerous, 14057),
-            ["DAV"] = new Star("White Dwarf", "DAV", StarType.Dangerous, 14057),
-            ["DB"] = new Star("White Dwarf", "DB", StarType.Dangerous, 14057),
-            ["DBZ"] = new Star("White Dwarf", "DBZ", StarType.Dangerous, 14057),
-            ["DBV"] = new Star("White Dwarf", "DBV", StarType.Dangerous, 14057),
-            ["DO"] = new Star("White Dwarf", "DO", StarType.Dangerous, 14057),
-            ["DOV"] = new Star("White Dwarf", "DOV", StarType.Dangerous, 14057),
-            ["DQ"] = new Star("White Dwarf", "DQ", StarType.Dangerous, 14057),
-            ["DC"] = new Star("White Dwarf", "DC", StarType.Dangerous, 14057),
-            ["DCV"] = new Star("White Dwarf", "DCV", StarType.Dangerous, 14057),
-            ["DX"] = new Star("White Dwarf", "DX", StarType.Dangerous, 14057),
-            ["N"] = new Star("Neutron Star", "", StarType.Dangerous, 22628),
-            ["H"] = new Star("Black Hole", "", StarType.Dangerous, 22628),
-            ["SuperMassiveBlackHole"] = new Star("Supermassive Black Hole", "", StarType.Dangerous, 33.5678),
-            ["Unknown"] = new Star("Unknown Star", "", StarType.Dangerous),
+            ["L"] = new Star("Brown Dwarf", "L", StarType.Safe, false),
+            ["T"] = new Star("Brown Dwarf", "T", StarType.Safe, false),
+            ["Y"] = new Star("Brown Dwarf", "Y", StarType.Safe, false),
+            ["TTS"] = new Star("T Tauri", "", StarType.Safe, false),
+            ["AeBe"] = new Star("Herbig Ae/Be", "", StarType.Safe, false),
+            ["W"] = new Star("Wolf-Rayet", "W", StarType.Safe, false),
+            ["WN"] = new Star("Wolf-Rayet", "WN", StarType.Safe, false),
+            ["WNC"] = new Star("Wolf-Rayet", "WNC", StarType.Safe, false),
+            ["WC"] = new Star("Wolf-Rayet", "WC", StarType.Safe, false),
+            ["WO"] = new Star("Wolf-Rayet", "WO", StarType.Safe, false),
+            ["CS"] = new Star("Carbon Star", "WCS", StarType.Safe, false),
+            ["C"] = new Star("Carbon Star", "C", StarType.Safe, false),
+            ["CN"] = new Star("Carbon Star", "CN", StarType.Safe, false),
+            ["CJ"] = new Star("Carbon Star", "CJ", StarType.Safe, false),
+            ["CH"] = new Star("Carbon Star", "CH", StarType.Safe, false),
+            ["CHd"] = new Star("Carbon Star", "CHd", StarType.Safe, false),
+            ["MS"] = new Star("Carbon Star", "MS", StarType.Safe, false),
+            ["S"] = new Star("Carbon Star", "S", StarType.Safe, false),
+            ["D"] = new Star("White Dwarf", "D", StarType.Dangerous, false, 14057),
+            ["DA"] = new Star("White Dwarf", "DA", StarType.Dangerous, false, 14057),
+            ["DAB"] = new Star("White Dwarf", "DAB", StarType.Dangerous, false, 14057),
+            ["DAO"] = new Star("White Dwarf", "DAO", StarType.Dangerous, false, 14057),
+            ["DAZ"] = new Star("White Dwarf", "DAZ", StarType.Dangerous, false, 14057),
+            ["DAV"] = new Star("White Dwarf", "DAV", StarType.Dangerous, false, 14057),
+            ["DB"] = new Star("White Dwarf", "DB", StarType.Dangerous, false, 14057),
+            ["DBZ"] = new Star("White Dwarf", "DBZ", StarType.Dangerous, false, 14057),
+            ["DBV"] = new Star("White Dwarf", "DBV", StarType.Dangerous, false, 14057),
+            ["DO"] = new Star("White Dwarf", "DO", StarType.Dangerous, false, 14057),
+            ["DOV"] = new Star("White Dwarf", "DOV", StarType.Dangerous, false, 14057),
+            ["DQ"] = new Star("White Dwarf", "DQ", StarType.Dangerous, false, 14057),
+            ["DC"] = new Star("White Dwarf", "DC", StarType.Dangerous, false, 14057),
+            ["DCV"] = new Star("White Dwarf", "DCV", StarType.Dangerous, false, 14057),
+            ["DX"] = new Star("White Dwarf", "DX", StarType.Dangerous, false, 14057),
+            ["N"] = new Star("Neutron Star", "", StarType.Dangerous, false, 22628),
+            ["H"] = new Star("Black Hole", "", StarType.Dangerous, false, 22628),
+            ["SupermassiveBlackHole"] = new Star("Supermassive Black Hole", "", StarType.Dangerous, false, 33.5678),
+            ["Unknown"] = new Star("Unknown Star", "", StarType.Dangerous, false),
         };
 
         public static readonly Dictionary<string, Material> MaterialLookup = new Dictionary<string, Material>()
@@ -390,6 +583,35 @@ namespace EDVRHUD
             ["zinc"] = new Material(RarityType.Common, MaterialType.Zinc),
             ["zirconium"] = new Material(RarityType.Common, MaterialType.Zirconium)
         };
+
+
+
+        public static string FixBodyTypeSpelling(string name)
+        {
+            //gas giants
+            return name
+                .Replace(" I ", " 1 ")
+                .Replace(" II ", " 2 ")
+                .Replace(" III ", " 3 ")
+                .Replace(" IV ", " 4 ")
+                .Replace(" V ", " 5 ");
+        }
+
+        public static string FixBodyNameSpelling(string name)
+        {
+            //ABC 4
+            //split letters only
+            var fixedname = "";
+            foreach (var letter in name)
+            {
+                fixedname += letter;
+                if (char.IsLetter(letter))
+                    fixedname += " ";
+            }
+            return fixedname
+                .ToUpperInvariant()
+                .Replace("A ", "eigh ");
+        }
     }
 
 

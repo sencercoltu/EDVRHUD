@@ -40,7 +40,7 @@ namespace EDVRHUD.HUDs
             ShowPanel(false);
         }
 
-        public override void JournalUpdate(string eventType, Dictionary<string, object> eventData)
+        public override void OnJournalUpdate(string eventType, Dictionary<string, object> eventData)
         {
             switch (eventType)
             {
@@ -67,7 +67,7 @@ namespace EDVRHUD.HUDs
                                 Redraw();
                                 //NotificationApp.Speech.SpeakAsyncCancelAll();
                                 if (!string.IsNullOrEmpty(DangerousStarName))
-                                    NotificationApp.Talk("Warning! Target is a " + DangerousStarName + ".");
+                                    NotificationApp.Talk("Warning! Destination is a " + DangerousStarName + ".");
                             }
                         }
                         else
@@ -98,18 +98,18 @@ namespace EDVRHUD.HUDs
             Alignment = StringAlignment.Center
         };
         
-        private int IconSize = 80;
+        //private int IconSize = 80;
 
         private Pen TopLinePen = new Pen(Color.FromArgb(255, 200, 0, 0), 3f);
         private Pen BottomLinePen = new Pen(Color.FromArgb(255, 255, 0, 0), 3f);
 
 
-        protected override void Redraw()
+        protected override void OnRedrawPanel()
         {
-            var imgOrigin = new Point(0, (TextureSize.Height - IconSize) / 2);
+            //var imgOrigin = new Point(0, (TextureSize.Height - IconSize) / 2);
 
 
-            var rect = new Rectangle(IconSize, 0, TextureSize.Width - IconSize, TextureSize.Height);
+            var rect = new Rectangle(0, 0, TextureSize.Width, TextureSize.Height);
 
             using (var g = GetGraphics())
             {
@@ -123,8 +123,8 @@ namespace EDVRHUD.HUDs
 
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     g.TextRenderingHint = TextRenderingHint.AntiAlias;                    
-                    g.DrawImage(Properties.Resources.Skull, imgOrigin.X, imgOrigin.Y, IconSize, IconSize);
-                    var str = "WARNING!" + Environment.NewLine + "Approaching " + DangerousStarName + "." + Environment.NewLine + "Throttle down now.";
+                    //g.DrawImage(Properties.Resources.Skull, imgOrigin.X, imgOrigin.Y, IconSize, IconSize);
+                    var str = "WARNING!" + Environment.NewLine + "Approaching a " + DangerousStarName + "." + Environment.NewLine + "Throttle down advised.";
                     g.DrawString(str, NotificationApp.EDFont, WarningBrush, rect, WarningFormat);
                 }
                 g.Flush();
