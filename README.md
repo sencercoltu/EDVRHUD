@@ -7,11 +7,13 @@ Existin tools bringing mirroring windows into the headset were poorly coded and 
 Currently there are only 3 panels.
 
 ### Jump Panel
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanel.png?raw=true"/>
 Shows remaining jumps to route, the current star type, and your FSD boost.
 ### Warning Panel
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/WarningPanel.png?raw=true"/>
 Pops up when jumping to a dangerous star like black hole, white dwarf or neutron star.
-
 ### Scan Panel
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/>
 Shows signal count in system, total estimated credits for your discoveries, and discovery percent. Also lists most valable bodies.
 List is sorted according to terraformability (ELW count as terraformable), planet values, body resources etc.  
 The system name included in body names are removed, instead you can see the body type.
