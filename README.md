@@ -2,9 +2,9 @@
 Elite Dangerous Virtual Reality Heads Up Display Extension(ish)
 
 I needed a tool for deep space exploration. Existing ones were not designed for VR, I needed to take off my headset frequently.
-Existin tools bringing mirroring windows into the headset were poorly coded and too difficult to read, so I wrote this little extension.
+Mirroring existing tools windows into the headset was too difficult to read, needed interaction, so I wrote this little extension.
 
-Currently there are only 3 panels.
+Currently there are only 3 panels for my exploration needs. But panels can easily be added for other roles.
 
 ### Jump Panel
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanel.png?raw=true"/>
@@ -25,8 +25,3 @@ All panels can be repositioned in the HUD by opening the corresponding panel fro
 Also includes a journal replay function. Once journal replay window is opened, journal listening stops, and you can replay your journal from the selected timestamp. Once exiting the replay window, all panels continue from where you left off.
 
 Tool can also be used without any VR headset by checking Disable VR option.
-
-
-
-
-
