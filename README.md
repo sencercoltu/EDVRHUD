@@ -1,6 +1,8 @@
 # EDVRHUD
 Elite Dangerous Virtual Reality Heads Up Display Extension(ish)
 
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanelVR.png?raw=true"/><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanelVR.png?raw=true"/>
+
 I needed a tool for deep space exploration. Existing ones were not designed for VR, I needed to take off my headset frequently.
 Mirroring existing tools windows into the headset was too difficult to read, needed interaction, so I wrote this little extension.
 
@@ -26,3 +28,5 @@ The tool includes a journal replay function. Once journal replay window is opene
 Tool can also be used without any VR headset by checking Disable VR option.
 
 Journals are stored in a LiteDB database. On first run, all journal logs will be imported to the database. The DB roughly takes two times the space of ED journal logs.
+
+### Requires .NET Runtime 4.7.2
