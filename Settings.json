@@ -1,1 +1,11 @@
-{"VoiceEnable":true,"Voice":"Microsoft Eva Mobile","VoiceRate":2,"VoiceVolume":100,"UseOpenVR":true,"AutoDiscoveryScan":false,"EDSMDestinationSystem":false,"EDSMNearbySystems":false,"Signals":false}
+{
+  "VoiceEnable": true,
+  "Voice": "Microsoft Eva Mobile",
+  "VoiceRate": 2,
+  "VoiceVolume": 100,
+  "UseOpenVR": true,
+  "AutoDiscoveryScan": false,
+  "EDSMDestinationSystem": false,
+  "EDSMNearbySystems": false,
+  "Signals": false
+}

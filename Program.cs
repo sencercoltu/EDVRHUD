@@ -18,12 +18,20 @@ namespace EDVRHUD
             Application.SetCompatibleTextRenderingDefault(false);
 
             var path = Environment.CurrentDirectory + "\\openvr_api.dll";
-            if (File.Exists(path)) File.Delete(path);
-            File.WriteAllBytes(path, Properties.Resources.openvr_api);
+            if (!File.Exists(path)) 
+                File.WriteAllBytes(path, Properties.Resources.openvr_api);
 
             path = Environment.CurrentDirectory + "\\LICENSES.txt";
-            if (File.Exists(path)) File.Delete(path);
-            File.WriteAllText(path, Properties.Resources.LICENSES);
+            if (!File.Exists(path)) 
+                File.WriteAllText(path, Properties.Resources.LICENSES);
+
+            path = Environment.CurrentDirectory + "\\Settings.json";
+            if (!File.Exists(path)) 
+                File.WriteAllBytes(path, Properties.Resources.Settings);
+
+            path = Environment.CurrentDirectory + "\\Panels.json";
+            if (!File.Exists(path))
+                File.WriteAllBytes(path, Properties.Resources.Panels);
 
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
 
@@ -32,6 +40,8 @@ namespace EDVRHUD
                 code.Run();
             }            
         }
+
+        
 
         private static Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
         {
