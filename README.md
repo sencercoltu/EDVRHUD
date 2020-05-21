@@ -19,7 +19,7 @@ Pops up when jumping to a dangerous star like black hole, white dwarf or neutron
 ### Scan Panel
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/>
 Top line shows signal count in system, total estimated credits for your discoveries, and discovery percentage. 
-Rest lists most valable bodies. List is sorted according to terraformability (ELW count as terraformable), planet values, body resources etc. The system name included in body names are removed, instead you can see the body type.
+Rest lists most valuable bodies. List is sorted according to planet values and body features. The repeating system name included in body names are removed, instead I used the body type.
 
 
 Letters in brackets show extra properties of the body or system:
