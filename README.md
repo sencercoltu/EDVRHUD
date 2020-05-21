@@ -1,4 +1,4 @@
-# EDVRHUD
+# EDVRHUD Extensions
 Elite Dangerous Virtual Reality Heads Up Display Extension(ish)
 
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanelVR.png?raw=true"/><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanelVR.png?raw=true"/>
