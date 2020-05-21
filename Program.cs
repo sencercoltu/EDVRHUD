@@ -21,6 +21,10 @@ namespace EDVRHUD
             if (File.Exists(path)) File.Delete(path);
             File.WriteAllBytes(path, Properties.Resources.openvr_api);
 
+            path = Environment.CurrentDirectory + "\\LICENSES.txt";
+            if (File.Exists(path)) File.Delete(path);
+            File.WriteAllText(path, Properties.Resources.LICENSES);
+
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
 
             using (var code = new NotificationApp())

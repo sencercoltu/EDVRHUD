@@ -161,6 +161,25 @@ namespace EDVRHUD.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to -------------------------------------------------------------------------------
+        ///https://github.com/michaelnoonan/inputsimulator/blob/master/LICENSE
+        ///
+        ///MIT License
+        ///
+        ///Copyright (c) 2019 Michael Noonan
+        ///
+        ///Permission is hereby granted, free of charge, to any person obtaining a copy
+        ///of this software and associated documentation files (the &quot;Software&quot;), to deal
+        ///in the Software without restriction, including without limitation the rights
+        ///to use, copy, modify, merge, publish, distribute, sublicense, and/or sell [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string LICENSES {
+            get {
+                return ResourceManager.GetString("LICENSES", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
         internal static byte[] LiteDB {

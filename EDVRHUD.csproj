@@ -204,5 +204,8 @@
   <ItemGroup>
     <None Include="packages\LiteDB.5.0.8\lib\net45\LiteDB.dll" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="LICENSES.txt" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
