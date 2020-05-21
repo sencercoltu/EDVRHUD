@@ -136,12 +136,16 @@ namespace EDVRHUD
                         LoadPanels(null, null);
                         ReplayMenu.Enabled = true;
                         StartJournalListening();
+                        ReplayForm = null;
                     }
                 };
             }
             LoadPanels(null, null);
-            ReplayForm.Show();
-            ReplayForm.Focus();
+            if (ReplayForm != null)
+            {
+                ReplayForm.Show();
+                ReplayForm.Focus();
+            }
         }
 
         public static SettingsForm SettingsForm { get; set; } = null;
@@ -252,11 +256,13 @@ namespace EDVRHUD
 
         private static void LoadPanels(object sender, EventArgs e)
         {
-            foreach (var panel in HudPanels)
+            foreach (MenuItem panel in PanelsMenu.MenuItems)
             {
-                panel.Dispose();
+                var p = panel.Tag as HudPanel;
+                p.Dispose();
             }
             HudPanels.Clear();
+            PanelsMenu.MenuItems.Clear();
 
             var path = Environment.CurrentDirectory + "\\Panels.json";
             string content;
