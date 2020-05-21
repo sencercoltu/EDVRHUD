@@ -43,14 +43,12 @@ Colour codes:
 * Red: Previously discovered and mapped.
 * Yellow: Self mapped.
 
-
-Voice feedback can be enabled in settings.
-
 All panels can be repositioned in the HUD by opening the corresponding panel from notification icon menu, and dragging the mouse while holding the left button and one of the modifier keys LCTRL, LSHIFT, RCRTL and RSHIFT. 
 
 The tool includes a journal replay function. Once journal replay window is opened, journal listening stops, and you can replay your journal from the selected timestamp. After closing the replay window, all panels continue from where you left off.
 
-Tool can also be used without any VR headset by checking Disable VR option.
+Voice feedback can be enabled in settings.
+Tool can also be used without any VR headset by checking Disable VR option in settings.
 
 Journals are stored in a LiteDB database. On first run, all journal logs will be imported to the database. The DB roughly takes two times the space of ED journal logs.
 
