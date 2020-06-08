@@ -11,7 +11,7 @@ Currently there are only 4 exploration panels added. But panels can easily be ad
 
 ### Jump Panel
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanel.png?raw=true"/>
-Shows remaining jumps to route, the current star type, and your FSD boost.
+Shows remaining jumps to destination, the current star type, and your FSD boost.
 
 ### Warning Panel
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/WarningPanel.png?raw=true"/>
