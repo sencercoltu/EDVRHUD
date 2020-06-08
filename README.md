@@ -3,11 +3,11 @@ Elite Dangerous Virtual Reality Heads Up Display Extensions
 
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanelVR.png?raw=true"/><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanelVR.png?raw=true"/>
 
-I needed a tool for deep space exploration. Existing ones were not designed for VR, I needed to take off my headset frequently.
-Mirroring existing tools windows into the headset was too difficult to read, needed interaction.
+Tool for deep space exploration. Existing ones were not designed for VR, I needed to take off my headset frequently.
+Mirroring windows into the headset was too difficult to read, needed interaction.
 I wrote this little extension so I don't need to remove the headset and my hands are always on HOTAS.
 
-Currently there are only 3 exploration panels added. But panels can easily be added for other roles.
+Currently there are only 4 exploration panels added. But panels can easily be added for other roles.
 
 ### Jump Panel
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanel.png?raw=true"/>
@@ -17,11 +17,14 @@ Shows remaining jumps to route, the current star type, and your FSD boost.
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/WarningPanel.png?raw=true"/>
 Pops up when jumping to a dangerous star like black hole, white dwarf or neutron star.
 
+### Travel History Panel
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/TravelHistory.png?raw=true"/>
+History of last 100 jumps in 2D.
+
 ### Scan Panel
 <img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/>
 Top line shows signal count in system, total estimated credits for your discoveries, and discovery percentage. 
 Rest lists most valuable bodies. List is sorted according to planet values and body features. The repeating system name included in body names are removed, instead I used the body type.
-
 
 Letters in brackets show extra properties of the body or system:
 * [ T ] Terraformable or EarthLike body
@@ -50,7 +53,7 @@ Tool can also be used without any VR headset by checking Disable VR option.
 Auto discovery scan is currently hardcoded to right mouse button.
 
 
-All panels can be repositioned in the HUD by opening the corresponding panel from notification icon menu, and dragging the mouse while holding the left button and one of the modifier keys LCTRL, LSHIFT, RCRTL and RSHIFT. 
+All panels can be repositioned/rotated/scaled in the HUD by opening the corresponding panel from notification icon menu, and dragging the mouse while holding the left, middle or right button and one of the modifier keys LCTRL, LSHIFT. 
 
 Load HUD reloads the last saved layout.
 Save HUD saves the layout (after repositioning, rotating panels).
