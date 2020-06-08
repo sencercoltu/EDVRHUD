@@ -23,7 +23,7 @@ Pops up when jumping to a dangerous star like black hole, white dwarf or neutron
 History of last 100 jumps in 2D.
 
 ### Scan Panel
-<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/>
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel2.png?raw=true"/>
 Top line shows signal count in system, total estimated credits for your discoveries, and discovery percentage. 
 Rest lists most valuable bodies. List is sorted according to planet values and body features. The repeating system name included in body names are removed, instead I used the body type.
 
