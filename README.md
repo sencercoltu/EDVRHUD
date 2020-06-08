@@ -39,7 +39,7 @@ Letters in brackets show extra properties of the body or system:
 * [ FR ] Fast rotation (hard coded < 1 H)
 * [ FO ] Fast orbital period (hard coded < 1 H)
 * [ SR ] Small radius (hard coded < 150 km)
-* [ Rn ] Body with rings more than 2 (n = ringcount)
+* [ Rn ] Body with 3 or more rings (n = ringcount)
 
 Colour codes:
 * Default orange: First discovered, unmapped.
