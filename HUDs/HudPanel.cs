@@ -1,5 +1,4 @@
 ﻿using EDVRHUD.HUDs;
-using EDVRHUD.Properties;
 using SharpDX;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
@@ -11,8 +10,6 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Runtime.Remoting.Channels;
-using System.Threading;
 using System.Windows.Forms;
 using Valve.VR;
 
@@ -22,11 +19,13 @@ namespace EDVRHUD
     {
         JumpInfo,
         Warning,
-        ScanInfo
+        ScanInfo,
+        TravelMap
     }
 
     public struct PanelSettings
     {
+        public bool Enabled;
         public HudType Type;
         public int Width;
         public int Height;
@@ -53,6 +52,18 @@ namespace EDVRHUD
             {
                 if (disposing)
                 {
+                    //unsubscribe events
+                    lock(EventSubscriptions)
+                    {
+                        foreach (var item in EventSubscriptions.ToList())
+                        {
+                            if (item.Value.Contains(this))
+                                item.Value.Remove(this);
+                            if (item.Value.Count == 0)
+                                EventSubscriptions.Remove(item.Key);
+                        }
+                    }
+
                     if (OverlayHandle != 0)
                     {
                         OpenVR.Overlay?.ClearOverlayTexture(OverlayHandle);
@@ -162,13 +173,14 @@ namespace EDVRHUD
 
             var hDesktopDC = Native.GetDC(Native.GetDesktopWindow());
 
-            if (NotificationApp.Settings.UseOpenVR)
+            if (EDCommon.Settings.UseOpenVR)
             {
                 var overlayError = OpenVR.Overlay?.CreateOverlay("OVRHUD_" + Name.ToLowerInvariant().Replace(" ", "_"), Name, ref OverlayHandle);
-                overlayError = OpenVR.Overlay?.SetOverlayFlag(OverlayHandle, VROverlayFlags.VisibleInDashboard, true);
+                overlayError = OpenVR.Overlay?.SetOverlayFlag(OverlayHandle, VROverlayFlags.VisibleInDashboard, false);
                 overlayError = OpenVR.Overlay?.SetOverlayFlag(OverlayHandle, VROverlayFlags.NoDashboardTab, true);
                 overlayError = OpenVR.Overlay?.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
                 overlayError = OpenVR.Overlay?.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale);
+                overlayError = OpenVR.Overlay?.SetOverlayAlpha(OverlayHandle, Settings.UnfocusAlpha);                
             }
             ShowPanel(true);
 
@@ -218,6 +230,8 @@ namespace EDVRHUD
                     return new ScanInfoPanel(settings); // new Size(settings.Width, settings.Height), ref settings.Position);
                 case HudType.Warning:
                     return new WarningPanel(settings); // new Size(settings.Width, settings.Height), ref settings.Position);
+                case HudType.TravelMap:
+                    return new TravelMapPanel(settings); // new Size(settings.Width, settings.Height), ref settings.Position);
                 default:
                     return null;
             }
@@ -229,25 +243,45 @@ namespace EDVRHUD
             return Graphics.FromImage(IntermediateBitmap);
         }
 
+        private Pen CursorPen = new Pen(Color.FromArgb(255, 255, 255, 255), 3f);
+
         internal void CapturePanel()
         {
             PanelUpdated -= 1;
             if (HudPreview != null)
                 HudPreview.Invalidate();
 
-            var data = IntermediateBitmap.LockBits(new Rectangle(0, 0, IntermediateBitmap.Width, IntermediateBitmap.Height), ImageLockMode.ReadOnly, IntermediateBitmap.PixelFormat);
+            var isInteractive = IsInteractive && HasFocus;
+
+            
+
+            Bitmap workBitmap = null;
+            if (isInteractive)
+            {
+                //draw cursor
+                workBitmap = new Bitmap(IntermediateBitmap);
+                using (var g = Graphics.FromImage(workBitmap))
+                {
+                    g.DrawEllipse(CursorPen, IntersectPoint.X - 3, IntersectPoint.Y - 3, 6, 6);
+                    g.Flush();
+                }
+            }
+            else
+                workBitmap = IntermediateBitmap;
+
+            var data = workBitmap.LockBits(new Rectangle(0, 0, workBitmap.Width, workBitmap.Height), ImageLockMode.ReadOnly, workBitmap.PixelFormat);
             unsafe
             {
                 //swap byteorder for texture
                 uint* byteData = (uint*)data.Scan0;
                 uint* offScreenData = (uint*)OffScreenPtr;
-                var len = IntermediateBitmap.Width * IntermediateBitmap.Height;
+                var len = workBitmap.Width * workBitmap.Height;
                 for (int i = 0; i < len; i++)
                 {
                     offScreenData[i] = (byteData[i] & 0x000000FF) << 16 | (byteData[i] & 0x0000FF00) | (byteData[i] & 0x00FF0000) >> 16 | (byteData[i] & 0xFF000000);
                 }
             }
-            IntermediateBitmap.UnlockBits(data);
+            workBitmap.UnlockBits(data);
 
             TextureDataBox[0].DataPointer = OffScreenPtr;
             TextureDataBox[0].RowPitch = data.Stride;
@@ -261,29 +295,33 @@ namespace EDVRHUD
 
         protected virtual void StartModifyOverlay()
         {
-            Debug.WriteLine("Start modify panel " + Name);
+            //Debug.WriteLine("Start modify panel " + Name);
             ShowPanel(true);
         }
 
         protected virtual void EndModifyOverlay()
         {
-            Debug.WriteLine("End modify panel " + Name);
+            //Debug.WriteLine("End modify panel " + Name);
             PanelUpdated = 2;
         }
 
         public void ModifyOverlayScale(int dx)
         {
             if (dx == 0) return;
+            //Debug.WriteLine("Scaling panel " + Name + " " + dx);
             Settings.Scale += dx / 1000f;
             if (Settings.Scale < 0.01f) Settings.Scale = 0.01f;
             else if (Settings.Scale > 10f) Settings.Scale = 10f;
-            var overlayError = OpenVR.Overlay.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale);
+            if (EDCommon.Settings.UseOpenVR)
+            {
+                var overlayError = OpenVR.Overlay.SetOverlayWidthInMeters(OverlayHandle, (PanelSize.Width / 1000f) * Settings.Scale);
+            }
         }
 
         public void ModifyOverlayTranslation(int dx, int dy)
         {
             if (dx == 0 && dy == 0) return;
-            Debug.WriteLine("Modifiying panel " + Name + " " + dx + "," + dy);
+            //Debug.WriteLine("Translating panel " + Name + " " + dx + "," + dy);
 
             if (Native.IsKeyDown(Keys.LControlKey))
             {
@@ -296,7 +334,15 @@ namespace EDVRHUD
                 Settings.Position.m7 -= dy / 1000f;
                 Settings.Position.m3 += dx / 1000f;
             }
-            else if (Native.IsKeyDown(Keys.RControlKey))
+            PanelUpdated = 2;
+        }
+
+        public void ModifyOverlayRotation(int dx, int dy)
+        {
+            if (dx == 0 && dy == 0) return;
+            //Debug.WriteLine("Rotating panel " + Name + " " + dx + "," + dy);
+
+            if (Native.IsKeyDown(Keys.LControlKey))
             {
                 //Z rot
                 roll += dx / 1000.0;
@@ -314,7 +360,7 @@ namespace EDVRHUD
                 Settings.Position.m9 = (float)m.M32;
                 Settings.Position.m10 = (float)m.M33;
             }
-            else if (Native.IsKeyDown(Keys.RShiftKey))
+            else if (Native.IsKeyDown(Keys.LShiftKey))
             {
                 //X and Y rot
                 yaw += dx / 1000.0;
@@ -347,6 +393,49 @@ namespace EDVRHUD
                 DoubleBuffered = true;
                 Panel = panel;
             }
+
+            protected override void OnClick(EventArgs e)
+            {
+                //base.OnClick(e);
+                Panel.OnClick(new Point(MousePosition.X, MousePosition.Y));
+            }
+
+            protected override void OnMouseWheel(MouseEventArgs e)
+            {
+                //base.OnMouseWheel(e);
+                Panel.OnScroll(e);
+            }
+
+            protected override void OnMouseMove(MouseEventArgs e)
+            {
+                base.OnMouseMove(e);
+                Panel.OnMouseMove(e);
+            }
+
+            protected override void OnKeyPress(KeyPressEventArgs e)
+            {
+                Panel.OnKeypress(e);
+            }
+        }
+
+        protected virtual void OnKeypress(KeyPressEventArgs e)
+        {
+            
+        }
+
+        public virtual void OnMouseMove(MouseEventArgs e)
+        {
+            
+        }
+
+        public virtual void OnClick(Point point)
+        {
+
+        }
+
+        public virtual void OnScroll(MouseEventArgs e)
+        {
+
         }
 
         internal void ShowPreview()
@@ -400,6 +489,8 @@ namespace EDVRHUD
                     var mousePos = Cursor.Position;
                     if (args.Button == MouseButtons.Left)
                         frm.Panel.ModifyOverlayTranslation(mousePos.X - initialPos.X, mousePos.Y - initialPos.Y);
+                    if (args.Button == MouseButtons.Middle)
+                        frm.Panel.ModifyOverlayRotation(mousePos.X - initialPos.X, mousePos.Y - initialPos.Y);
                     else if (args.Button == MouseButtons.Right)
                         frm.Panel.ModifyOverlayScale(mousePos.X - initialPos.X);
                     Cursor.Position = frm.InitialMousePos;
@@ -413,7 +504,7 @@ namespace EDVRHUD
         {
             if (PanelVisible != show)
             {
-                if (NotificationApp.Settings.UseOpenVR)
+                if (EDCommon.Settings.UseOpenVR)
                 {
                     if (PanelVisible)
                     {
@@ -432,43 +523,48 @@ namespace EDVRHUD
 
         private VROverlayIntersectionResults_t IntersectionResult = new VROverlayIntersectionResults_t();
 
+        public bool HasFocus { get; private set; }
         private float CurrentAlpha;
-
+        private PointF IntersectPoint = new PointF(0, 0);
+        private const float AlphaStep = 0.05f;
         internal bool LookAt(ref VROverlayIntersectionParams_t intersectionParams)
         {
-            if (Settings.Alpha == Settings.UnfocusAlpha)
+            if (!PanelVisible)
                 return false;
 
-            if (NotificationApp.Settings.UseOpenVR)
+            if (EDCommon.Settings.UseOpenVR)
             {
-                if (OpenVR.Overlay.ComputeOverlayIntersection(OverlayHandle, ref intersectionParams, ref IntersectionResult))
+                HasFocus = OpenVR.Overlay.ComputeOverlayIntersection(OverlayHandle, ref intersectionParams, ref IntersectionResult);
+
+
+                if (HasFocus)
                 {
+                    IntersectPoint = new PointF(IntersectionResult.vUVs.v0 * TextureSize.Width, (1f - IntersectionResult.vUVs.v1) * TextureSize.Height);
+                    RefreshUpdate(1);
                     if (CurrentAlpha != Settings.Alpha)
                     {
-                        CurrentAlpha += 0.005f;
+                        CurrentAlpha += AlphaStep;
                         if (CurrentAlpha > Settings.Alpha) CurrentAlpha = Settings.Alpha;
-                        OpenVR.Overlay.SetOverlayAlpha(OverlayHandle, CurrentAlpha);
-                        return true;
-                    }
-                    //Debug.WriteLine(Name + " intersect.");
+                        OpenVR.Overlay.SetOverlayAlpha(OverlayHandle, CurrentAlpha);                        
+                    }                    
                 }
                 else
-                {
+                {                    
                     if (CurrentAlpha != Settings.UnfocusAlpha)
                     {
-                        CurrentAlpha -= 0.005f;
+                        CurrentAlpha -= AlphaStep;
                         if (CurrentAlpha < Settings.UnfocusAlpha) CurrentAlpha = Settings.UnfocusAlpha;
                         OpenVR.Overlay.SetOverlayAlpha(OverlayHandle, CurrentAlpha);
-                        return true;
+                        return true; //return true if still fading
                     }
                 }
             }
-            return false;
+            return HasFocus;
         }
 
         internal void SendOverlay()
         {
-            if (NotificationApp.Settings.UseOpenVR)
+            if (EDCommon.Settings.UseOpenVR)
             {
                 var overlayError = OpenVR.Overlay.SetOverlayTransformAbsolute(OverlayHandle, ETrackingUniverseOrigin.TrackingUniverseSeated, ref Settings.Position);
                 overlayError = OpenVR.Overlay.SetOverlayTexture(OverlayHandle, ref OVRTexture);
@@ -477,9 +573,28 @@ namespace EDVRHUD
 
         public int PanelUpdated { get; set; } = 0;
 
-        public static Dictionary<string, object> EDSMSystemInfo { get; private set; } = new Dictionary<string, object>();
-        public static Dictionary<string, object>[] EDSMNearbySystems { get; private set; } = new Dictionary<string, object>[0];
+        protected void SubscribeEvents(params string[] eventTypes)
+        {
+            if (eventTypes == null || eventTypes.Length == 0)
+                return;
 
+            lock (EventSubscriptions)
+            {
+                foreach (var type in eventTypes)
+                {
+                    HashSet<HudPanel> eventSubs = null;
+                    EventSubscriptions.TryGetValue(type, out eventSubs);
+                    if (eventSubs == null)
+                    {
+                        eventSubs = new HashSet<HudPanel>();
+                        EventSubscriptions[type] = eventSubs;
+                    }
+                    eventSubs.Add(this);
+                }
+            }
+        }
+
+        private static Dictionary<string, HashSet<HudPanel>> EventSubscriptions { get; set; } = new Dictionary<string, HashSet<HudPanel>>();
 
         public static void JournalUpdate(string eventType, Dictionary<string, object> entry, IEnumerable<HudPanel> panelList)
         {
@@ -489,16 +604,16 @@ namespace EDVRHUD
                 case "StartJump":
                     //started jumping
                     {
-                        if (NotificationApp.Settings.EDSMDestinationSystem && entry.GetProperty("JumpType", "") == "Hyperspace")
+                        if (EDCommon.Settings.EDSMDestinationSystem && entry.GetProperty("JumpType", "") == "Hyperspace")
                         {
 
-                            EDSMSystemInfo.Clear();
+                            EDCommon.EDSMSystemInfo.Clear();
                             var systemAddress = entry.GetProperty("SystemAddress", 0UL);
                             if (systemAddress != 0)
                             {
                                 EDCommon.RequestEDSMSystemInfo(systemAddress, d =>
                                 {
-                                    EDSMSystemInfo = d;
+                                    EDCommon.EDSMSystemInfo = d;
                                     if (d.Count > 0)
                                     {
                                         var commander = "an unknown commander";
@@ -511,7 +626,7 @@ namespace EDVRHUD
                                                 if (!string.IsNullOrWhiteSpace(c))
                                                     commander = "commander " + c;
                                             }
-                                            NotificationApp.Talk("Destination system was previously discovered by " + commander + ".");
+                                            EDCommon.Talk("Destination system was previously discovered by " + commander + ".");
                                         }
                                     }
                                 });
@@ -523,17 +638,17 @@ namespace EDVRHUD
                 case "FSSDiscoveryScan":
                     //end jump
                     {
-                        if (NotificationApp.Settings.EDSMNearbySystems)
+                        if (EDCommon.Settings.EDSMNearbySystems)
                         {
-                            EDSMNearbySystems = new Dictionary<string, object>[0];
+                            EDCommon.EDSMNearbySystems = new Dictionary<string, object>[0];
                             var name = entry.GetProperty("SystemName", "");
                             if (!string.IsNullOrEmpty(name))
                             {
                                 EDCommon.RequestEDSMNearbySystems(name, d =>
                                 {
-                                    EDSMNearbySystems = d;
+                                    EDCommon.EDSMNearbySystems = d;
                                     if (d.Length > 0)
-                                        NotificationApp.Talk("There are " + d.Length + " previously discovered systems nearby.");
+                                        EDCommon.Talk("There are " + d.Length + " previously discovered systems nearby.");
                                 });
                             }
                         }
@@ -544,28 +659,31 @@ namespace EDVRHUD
                         if (!replay)
                         {
                             var addr = entry.GetProperty("SystemAddress", 0L);
-                            NotificationApp.ReplayScans(addr);
+                            NotificationApp.RefreshScans(addr);
                         }
                     }
                     break;
             }
 
-            foreach (var panel in panelList)
-            {
-                panel.OnJournalUpdate(eventType, entry);
-            }
+            HashSet<HudPanel> eventSubs = null;
+            lock (EventSubscriptions)
+                EventSubscriptions.TryGetValue(eventType, out eventSubs);
+            if (eventSubs == null)
+                return;
 
+            foreach (var subs in eventSubs)
+                subs.OnJournalUpdate(eventType, entry);
         }
 
         public abstract void OnJournalUpdate(string eventType, Dictionary<string, object> entry);
 
-
-
         protected abstract void OnRedrawPanel();
+
+        public bool IsInteractive { get; protected set; } = false;
 
         protected bool NeedsRedraw = false;
 
-        protected void Redraw()
+        public void Redraw()
         {
             NeedsRedraw = true;
         }
@@ -578,9 +696,9 @@ namespace EDVRHUD
             OnRedrawPanel();
         }
 
-        internal void RefreshUpdate()
+        internal void RefreshUpdate(int count = 2)
         {
-            PanelUpdated = 2;
+            PanelUpdated = count;
         }
 
         internal void EDStatusChanged(StatusFlags status, GUIFocus guiFocus)

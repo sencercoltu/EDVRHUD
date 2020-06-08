@@ -1,20 +1,21 @@
 ﻿using EDVRHUD.HUDs;
 using LiteDB;
+using SharpDX.DirectInput;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
-using System.Runtime.InteropServices;
-using System.Security.Permissions;
+using System.Security.Policy;
+using System.Speech.Synthesis;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Web.Script.Serialization;
+using System.Xml;
+using WindowsInput;
 
 namespace EDVRHUD
 {
@@ -25,9 +26,9 @@ namespace EDVRHUD
         None = 0,
         Docked = 1 << 0, //(on a landing pad)
         Landed = 1 << 1, //(on planet surface)
-        GearDown = 1 << 2, //Landing Gear Down
-        ShieldsUp = 1 << 3, // Shields Up
-        Supercruise = 1 << 4, // Supercruise
+        GearDown = 1 << 2,
+        ShieldsUp = 1 << 3,
+        Supercruise = 1 << 4,
         FlightAssistOff = 1 << 5,
         HardpointsDeployed = 1 << 6,
         InWing = 1 << 7,
@@ -178,12 +179,12 @@ namespace EDVRHUD
         public double K { get; set; }
     }
 
-    internal class Planet
+    internal class Body
     {
         public string Name { get; set; }
         public double K { get; set; }
         public double TerraformableBonus { get; set; }
-        public Planet(string name, double k = 300, double terraformableBonus = 93328)
+        public Body(string name, double k = 300, double terraformableBonus = 93328)
         {
             Name = name;
             K = k;
@@ -192,13 +193,186 @@ namespace EDVRHUD
 
     }
 
+    internal class HudSettings
+    {
+        public bool VoiceEnable { get; set; } = true;
+        public string Voice { get; set; } = "";
+        public int VoiceRate { get; set; } = 4; //-10 to 10
+        public int VoiceVolume { get; set; } = 100; //0 to 100
+        public bool UseOpenVR { get; set; } = true;
+        public bool AutoDiscoveryScan { get; set; } = false;
+        public bool EDSMDestinationSystem { get; set; } = false;
+        public bool EDSMNearbySystems { get; set; } = false;
+        public bool Signals { get; set; } = false;
+
+        public JoystickMapping ScrollUp { get; set; } = new JoystickMapping();
+        public JoystickMapping ScrollDown { get; set; } = new JoystickMapping();
+    }
+
+    internal class TravelInfo
+    {
+        public string Timestamp { get; set; }
+        public string SystemName { get; set; }
+        public float[] Coords { get; set; } = new float[3];
+        public ulong SystemAddress { get; set; }
+        public bool IsReset { get; set; }
+    }
+    internal class JoystickMapping
+    {
+        [ScriptIgnore]
+        public string Display { get { return string.IsNullOrEmpty(ObjectName) ? "Empty" : InstanceName + " \\ " + ObjectName; } }
+        [ScriptIgnore]
+        public bool LastState { get; set; } = false;
+        public string InstanceName { get; set; }
+        public Guid InstanceGuid { get; set; }
+        public string ObjectName { get; set; }
+        public int ObjectOffset { get; set; } = -1;
+        
+    }
+
 
     internal static class EDCommon
     {
+        public static DirectInput DirectInput = new DirectInput();
+
+        public static List<Joystick> InputDevices = new List<Joystick>();
+
+        public static JavaScriptSerializer Serializer { get; } = new JavaScriptSerializer();
+
+        public static HudSettings Settings { get; set; } = new HudSettings();
+
+        public static void SaveSettings()
+        {
+            var s = Serializer.Serialize(Settings);
+            var path = Environment.CurrentDirectory + "\\Settings.json";
+            File.WriteAllText(path, s);
+            ApplySettings();
+        }
+
+        public static void LoadSettings()
+        {
+            var path = Environment.CurrentDirectory + "\\Settings.json";
+            string content;
+            if (File.Exists(path))
+                content = File.ReadAllText(path);
+            else
+                content = Encoding.UTF8.GetString(Properties.Resources.Settings);
+
+            Settings = Serializer.Deserialize<HudSettings>(content);
+
+            if (string.IsNullOrEmpty(Settings.Voice))
+            {
+                var voice = Speech.GetInstalledVoices().FirstOrDefault(s => s.VoiceInfo.Gender == VoiceGender.Female);
+                if (voice != null)
+                    Settings.Voice = voice.VoiceInfo.Name;
+            }
+            ApplySettings();
+            LoadBindings();
+        }
+
+        private static XmlElement EDBindings = null;
+
+        private static void LoadBindings()
+        {
+            var bindingsPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            bindingsPath = Path.Combine(bindingsPath, "Frontier Developments", "Elite Dangerous", "Options", "Bindings");
+            var bindingsFile = Directory.EnumerateFiles(bindingsPath, "Custom.?.?.binds").OrderByDescending(f => f).FirstOrDefault();
+            try
+            {
+                var bindings = File.ReadAllText(bindingsFile);
+                var doc = new XmlDocument();
+                doc.LoadXml(bindings);
+                EDBindings = doc.DocumentElement;
+                //var upNode = doc.DocumentElement.SelectSingleNode("UI_Up/Primary"); //upNode.Attributes["Device"].Value upNode.Attributes["Key"].Value
+                //var downNode = doc.DocumentElement.SelectSingleNode("UI_Down/Primary");
+                //var leftNode = doc.DocumentElement.SelectSingleNode("UI_Left/Primary");
+                //var rightNode = doc.DocumentElement.SelectSingleNode("UI_Right/5Primary");
+            }
+            catch
+            {
+                EDBindings = null;
+            }
+        }
+
+        public static string GetBinding(string binding, string key = "Primary")
+        {
+            if (EDBindings == null)
+                return null;
+            var elem = EDBindings.SelectSingleNode("\\binding\\" + key);
+            return elem?.Value;
+        }
+
+        public static void ClearInputDevices()
+        {
+            lock (EDCommon.InputDevices)
+            {
+                foreach (var joystick in InputDevices)
+                {
+                    joystick.Unacquire();
+                    joystick.Dispose();
+                }
+
+                InputDevices.Clear();
+            }
+        }
+
+        public static void ApplySettings()
+        {
+            Speech.SelectVoice(Settings.Voice);
+            Speech.Rate = Settings.VoiceRate;
+            Speech.Volume = Settings.VoiceVolume;
+
+            ClearInputDevices();
+
+            if (Settings.ScrollUp.InstanceGuid != Guid.Empty)
+            {
+                var joystick = new Joystick(DirectInput, Settings.ScrollUp.InstanceGuid);
+                joystick.Properties.BufferSize = 256;
+                lock (EDCommon.InputDevices)
+                    InputDevices.Add(joystick);
+                joystick.Acquire();
+            }
+            if (Settings.ScrollDown.InstanceGuid != Guid.Empty)
+            {
+                var joystick = new Joystick(DirectInput, Settings.ScrollDown.InstanceGuid);
+                joystick.Properties.BufferSize = 256;
+                lock (EDCommon.InputDevices)
+                    InputDevices.Add(joystick);
+                joystick.Acquire();
+            }
+
+        }
+
+
+
+        public static SpeechSynthesizer Speech = new SpeechSynthesizer();
+        public static bool InitialLoad { get; internal set; } = false;
+
+        public static void Talk(string s, bool async = true)
+        {
+            if (InitialLoad)
+                return;
+
+            if (Settings.VoiceEnable)
+            {
+                if (async) Speech.SpeakAsync(s);
+                else Speech.Speak(s);
+            }
+        }
+
+        public static void Shutup()
+        {
+            Speech.SpeakAsyncCancelAll();
+        }
+
+
+        public static InputSimulator InputSimulator = new InputSimulator();
+
+
         public static LiteDatabase DB { get; set; } = null;
         public static ILiteCollection<Dictionary<string, object>> DBJournal { get; set; }
         public static ILiteCollection<Dictionary<string, object>> DBSettings { get; set; }
-        //public static int DBSequence = DateTime.Now.Millisecond;
+
         public static DateTime DBEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         public static ObjectId DBIDForEntry(DateTime ts, string eventtype, Dictionary<string, object> entry)
@@ -213,7 +387,7 @@ namespace EDVRHUD
                     hashCode = (eventtype + "#" + entry.GetProperty("Module", "")).GetHashCode();
                     break;
                 case "ReceiveText":
-                    hashCode = (eventtype + "#" + entry.GetProperty("Message", "")).GetHashCode();
+                    hashCode = (eventtype + "#" + entry.GetProperty("From", "") + entry.GetProperty("Message", "")).GetHashCode();
                     break;
                 case "ShipTargeted":
                     hashCode = (eventtype + "#" + entry.GetProperty("ScanStage", 0) + "#" + entry.GetProperty("Ship", "") + "#" + entry.GetProperty("PilotName", "")).GetHashCode();
@@ -253,25 +427,6 @@ namespace EDVRHUD
             }
             return new ObjectId((int)((ts - DBEpoch).TotalSeconds), hashCode, 0, 0);
         }
-
-        //[DllImport("user32.dll", SetLastError = true)]
-        //private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        //[DllImport("user32.dll")]
-        //private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-
-
-        //private static IntPtr _edWindowHandle = IntPtr.Zero;
-        //public static IntPtr GetEDWindowHandle
-        //{
-        //    get
-        //    {
-        //        if (_edWindowHandle == IntPtr.Zero)
-        //            _edWindowHandle = FindWindow("FrontierDevelopmentsAppWinClass", "Elite - Dangerous (CLIENT)");
-        //        return _edWindowHandle;
-        //    }
-        //}
-
 
         private static bool GetPropertyInternal<T>(IDictionary<string, object> dict, string key, T defaultValue, out T result)
         {
@@ -340,7 +495,7 @@ namespace EDVRHUD
             }
             else if (body.IsPlanet)
             {
-                if (PlanetLookup.TryGetValue(body.BodyType, out var p))
+                if (BodyLookup.TryGetValue(body.BodyType, out var p))
                 {
                     k = p.K;
                     if (body.Terraformable) k += p.TerraformableBonus;
@@ -367,10 +522,14 @@ namespace EDVRHUD
             }
         }
 
+        public static Dictionary<string, object> EDSMSystemInfo { get; set; } = new Dictionary<string, object>();
+        public static Dictionary<string, object>[] EDSMNearbySystems { get; set; } = new Dictionary<string, object>[0];
+
+
         private static Thread EDSMSystemRequestThread = null;
         private static Thread EDSMNearbySystemsThread = null;
 
-        internal static void RequestEDSMNearbySystems(string systemName, Action<Dictionary<string, object>[]> newarbySystemsCallback)
+        public static void RequestEDSMNearbySystems(string systemName, Action<Dictionary<string, object>[]> newarbySystemsCallback)
         {
             if (EDSMNearbySystemsThread != null)
             {
@@ -422,7 +581,7 @@ namespace EDVRHUD
             EDSMNearbySystemsThread.Start();
         }
 
-        internal static void RequestEDSMSystemInfo(ulong systemAddress, Action<Dictionary<string, object>> systemInfoCallback)
+        public static void RequestEDSMSystemInfo(ulong systemAddress, Action<Dictionary<string, object>> systemInfoCallback)
         {
             if (EDSMSystemRequestThread != null)
             {
@@ -474,27 +633,27 @@ namespace EDVRHUD
             EDSMSystemRequestThread.Start();
         }
 
-        public static readonly Dictionary<string, Planet> PlanetLookup = new Dictionary<string, Planet>
+        public static readonly Dictionary<string, Body> BodyLookup = new Dictionary<string, Body>
         {
-            ["Ammonia world"] = new Planet("Ammonia world", 96932),
-            ["Earthlike body"] = new Planet("Earthlike body", 64831, 116295),
-            ["Water world"] = new Planet("Water world", 64831, 116295),
-            ["High metal content body"] = new Planet("High metal content body", 9654, 100677),
-            ["Icy body"] = new Planet("Icy body"),
-            ["Metal rich body"] = new Planet("Metal rich body", 21790, 65631),
-            ["Rocky body"] = new Planet("Rocky body"),
-            ["Rocky ice body"] = new Planet("Rocky ice body"),
-            ["Sudarsky class I gas giant"] = new Planet("Sudarsky class I gas giant", 1656),
-            ["Sudarsky class II gas giant"] = new Planet("Sudarsky class II gas giant", 9654, 100677),
-            ["Sudarsky class III gas giant"] = new Planet("Sudarsky class III gas giant"),
-            ["Sudarsky class IV gas giant"] = new Planet("Sudarsky class IV gas giant"),
-            ["Sudarsky class V gas giant"] = new Planet("Sudarsky class V gas giant"),
-            ["Gas giant with ammonia based life"] = new Planet("Gas giant with ammonia based life"),
-            ["Gas giant with water based life"] = new Planet("Gas giant with water based life"),
-            ["Helium rich gas giant"] = new Planet("Helium rich gas giant"),
-            ["Helium gas giant"] = new Planet("Helium gas giant"),
-            ["Water giant"] = new Planet("Water giant"),
-            ["Water giant with life"] = new Planet("Water giant with life")
+            ["Ammonia world"] = new Body("Ammonia world", 96932),
+            ["Earthlike body"] = new Body("Earthlike body", 64831, 116295),
+            ["Water world"] = new Body("Water world", 64831, 116295),
+            ["High metal content body"] = new Body("High metal content body", 9654, 100677),
+            ["Icy body"] = new Body("Icy body"),
+            ["Metal rich body"] = new Body("Metal rich body", 21790, 65631),
+            ["Rocky body"] = new Body("Rocky body"),
+            ["Rocky ice body"] = new Body("Rocky ice body"),
+            ["Sudarsky class I gas giant"] = new Body("Sudarsky class I gas giant", 1656),
+            ["Sudarsky class II gas giant"] = new Body("Sudarsky class II gas giant", 9654, 100677),
+            ["Sudarsky class III gas giant"] = new Body("Sudarsky class III gas giant"),
+            ["Sudarsky class IV gas giant"] = new Body("Sudarsky class IV gas giant"),
+            ["Sudarsky class V gas giant"] = new Body("Sudarsky class V gas giant"),
+            ["Gas giant with ammonia based life"] = new Body("Gas giant with ammonia based life"),
+            ["Gas giant with water based life"] = new Body("Gas giant with water based life"),
+            ["Helium rich gas giant"] = new Body("Helium rich gas giant"),
+            ["Helium gas giant"] = new Body("Helium gas giant"),
+            ["Water giant"] = new Body("Water giant"),
+            ["Water giant with life"] = new Body("Water giant with life")
         };
 
         public static readonly Dictionary<string, Star> StarLookup = new Dictionary<string, Star>
@@ -584,9 +743,7 @@ namespace EDVRHUD
             ["zirconium"] = new Material(RarityType.Common, MaterialType.Zirconium)
         };
 
-
-
-        public static string FixBodyTypeSpelling(string name)
+        public static string FixBodyTypePronunciation(string name)
         {
             //gas giants
             return name
@@ -597,7 +754,7 @@ namespace EDVRHUD
                 .Replace(" V ", " 5 ");
         }
 
-        public static string FixBodyNameSpelling(string name)
+        public static string FixBodyNamePronunciation(string name)
         {
             //ABC 4
             //split letters only
@@ -611,6 +768,67 @@ namespace EDVRHUD
             return fixedname
                 .ToUpperInvariant()
                 .Replace("A ", "eigh ");
+        }
+
+        public static List<TravelInfo> TravelMapData { get; } = new List<TravelInfo>();
+
+        public static void LoadTravelMap(string startTime)
+        {
+            var systems = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.GTE("timestamp", new BsonValue(startTime)), LiteDB.Query.Or(LiteDB.Query.EQ("event", "FSDJump"), LiteDB.Query.EQ("event", "Location")), LiteDB.Query.Not("StarPos", null)));
+
+            foreach (var system in systems.OrderBy(d => d["timestamp"]))
+            {
+                AddTravelData(system);
+            }
+        }
+
+        public static void AddTravelData(Dictionary<string, object> system)
+        {
+            var sa = system.GetProperty("SystemAddress", 0ul);
+            if (sa == 0) return;
+            var ts = system.GetProperty("timestamp", "");
+            if (string.IsNullOrEmpty(ts))
+                return;
+            var sn = system.GetProperty("StarSystem", "");
+            if (string.IsNullOrEmpty(sn))
+                return;
+
+            var oc = system.GetProperty("StarPos", null as object);
+            if (oc == null)
+                return;
+
+            var ti = new TravelInfo
+            {
+                SystemAddress = sa,
+                Timestamp = ts,
+                SystemName = sn
+            };
+
+            var evt = system.GetProperty("event", "");
+            if (evt == "Location")
+                ti.IsReset = true;
+
+            if (oc is object[] ocoords)
+            {
+                ti.Coords[0] = Convert.ToSingle(ocoords[0]);
+                ti.Coords[1] = Convert.ToSingle(ocoords[1]);
+                ti.Coords[2] = Convert.ToSingle(ocoords[2]);
+            }
+            else if (oc is ArrayList acoords)
+            {
+                ti.Coords[0] = Convert.ToSingle(acoords[0]);
+                ti.Coords[1] = Convert.ToSingle(acoords[1]);
+                ti.Coords[2] = Convert.ToSingle(acoords[2]);
+            }
+            else
+            {
+
+            }
+
+            TravelMapData.Add(ti);
+            //limit to 100 jumps
+            if (TravelMapData.Count > 100)
+                TravelMapData.RemoveAt(0);
         }
     }
 

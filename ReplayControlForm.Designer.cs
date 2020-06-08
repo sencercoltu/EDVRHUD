@@ -93,7 +93,7 @@
             // chkAutoPause
             // 
             this.chkAutoPause.AutoSize = true;
-            this.chkAutoPause.Location = new System.Drawing.Point(2, 75);
+            this.chkAutoPause.Location = new System.Drawing.Point(2, 87);
             this.chkAutoPause.Name = "chkAutoPause";
             this.chkAutoPause.Size = new System.Drawing.Size(153, 17);
             this.chkAutoPause.TabIndex = 6;
@@ -132,7 +132,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(410, 100);
+            this.ClientSize = new System.Drawing.Size(410, 116);
             this.Controls.Add(this.dtpStartTime);
             this.Controls.Add(this.dtpStartDate);
             this.Controls.Add(this.chkAutoPause);

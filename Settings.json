@@ -1,11 +1,1 @@
-{
-  "VoiceEnable": true,
-  "Voice": "Microsoft Eva Mobile",
-  "VoiceRate": 2,
-  "VoiceVolume": 100,
-  "UseOpenVR": true,
-  "AutoDiscoveryScan": false,
-  "EDSMDestinationSystem": false,
-  "EDSMNearbySystems": false,
-  "Signals": false
-}
+{"VoiceEnable":true,"Voice":"Microsoft Eva Mobile","VoiceRate":2,"VoiceVolume":100,"UseOpenVR":true,"AutoDiscoveryScan":true,"EDSMDestinationSystem":true,"EDSMNearbySystems":false,"Signals":true,"ScrollUp":{"InstanceName":"Saitek Pro Flight X-55 Rhino Throttle","InstanceGuid":"0a661d20-e319-11e5-8006-444553540000","ObjectName":"Buttons29","ObjectOffset":77},"ScrollDown":{"InstanceName":"Saitek Pro Flight X-55 Rhino Throttle","InstanceGuid":"0a661d20-e319-11e5-8006-444553540000","ObjectName":"Buttons30","ObjectOffset":78}}

@@ -1,73 +1,30 @@
-﻿using EDVRHUD.HUDs;
-using LiteDB;
+﻿using LiteDB;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Security.Policy;
-using System.Speech.Synthesis;
 using System.Text;
 using System.Threading;
-using System.Web.Script.Serialization;
 using System.Windows.Forms;
-using System.Xml;
 using Valve.VR;
-using WindowsInput;
+using System.Resources;
+using SharpDX.DirectInput;
+using System.Diagnostics;
 
 namespace EDVRHUD
 {
     class NotificationApp : ApplicationContext
     {
-        public class HudSettings
-        {
-            public bool VoiceEnable { get; set; } = true;
-            public string Voice { get; set; } = "";
-            public int VoiceRate { get; set; } = 4; //-10 to 10
-            public int VoiceVolume { get; set; } = 100; //0 to 100
-            public bool UseOpenVR { get; set; } = true;
-            public bool AutoDiscoveryScan { get; set; } = false;
-            public bool EDSMDestinationSystem { get; set; } = false;
-            public bool EDSMNearbySystems { get; set; } = false;
-            public bool Signals { get; set; } = false;
-        }
-
-        public static bool InitialLoad { get; private set; } = false;
-
-        public static HudSettings Settings { get; set; } = new HudSettings();
-
-        internal static SpeechSynthesizer Speech = new SpeechSynthesizer();
-        private static XmlElement EDBindings = null;
-
-
-        public static void Talk(string s, bool async = true)
-        {
-            if (InitialLoad)
-                return;
-
-            if (Settings.VoiceEnable)
-            {
-                if (async) Speech.SpeakAsync(s);
-                else Speech.Speak(s);
-            }
-        }
-
-        public static void Shutup()
-        {
-            Speech.SpeakAsyncCancelAll();
-        }
 
         private NotifyIcon TrayIcon { get; set; }
         public static bool AppRunning { get; private set; } = true;
-        private static JavaScriptSerializer Serializer { get; } = new JavaScriptSerializer();
-        public static Font EDFont { get; private set; }
 
-        public static InputSimulator InputSimulator = new InputSimulator();
+        public static Font EDFont { get; private set; }
 
         public static SolidBrush DefaultBrush = new SolidBrush(Color.FromArgb(245, 178, 9));
         public static Color DefaultClearColor = Color.FromArgb(0, 0, 0, 0); // 0 olacak hepsi
@@ -123,8 +80,9 @@ namespace EDVRHUD
         {
             if (ReplayForm == null)
             {
-                Talk("Stopping journal listening.", false);
+                EDCommon.Talk("Stopping journal listening.", false);
                 StopJournalListening();
+                EDCommon.TravelMapData.Clear();
                 ReplayMenu.Enabled = false;
                 ReplayForm = new ReplayControlForm();
                 ReplayForm.Icon = Properties.Resources.Icon;
@@ -132,7 +90,7 @@ namespace EDVRHUD
                 {
                     if (AppRunning)
                     {
-                        Talk("Resuming journal listening.", false);
+                        EDCommon.Talk("Resuming journal listening.", false);
                         LoadPanels(null, null);
                         ReplayMenu.Enabled = true;
                         StartJournalListening();
@@ -170,71 +128,6 @@ namespace EDVRHUD
             SettingsForm.Show();
         }
 
-        public static void SaveSettings()
-        {
-            var s = Serializer.Serialize(Settings);
-            var path = Environment.CurrentDirectory + "\\Settings.json";
-            File.WriteAllText(path, s);
-            ApplySettings();
-        }
-
-        private static void LoadSettings()
-        {
-            var path = Environment.CurrentDirectory + "\\Settings.json";
-            string content;
-            if (File.Exists(path))
-                content = File.ReadAllText(path);
-            else
-                content = Encoding.UTF8.GetString(Properties.Resources.Settings);
-
-            Settings = Serializer.Deserialize<HudSettings>(content);
-
-            if (string.IsNullOrEmpty(Settings.Voice))
-            {
-                var voice = Speech.GetInstalledVoices().FirstOrDefault(s => s.VoiceInfo.Gender == VoiceGender.Female);
-                if (voice != null)
-                    Settings.Voice = voice.VoiceInfo.Name;
-            }
-            ApplySettings();
-            LoadBindings();
-        }
-
-        private static void LoadBindings()
-        {
-            var bindingsPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            bindingsPath = Path.Combine(bindingsPath, "Frontier Developments", "Elite Dangerous", "Options", "Bindings");
-            var bindingsFile = Directory.EnumerateFiles(bindingsPath, "Custom.?.?.binds").OrderByDescending(f => f).FirstOrDefault();
-            try
-            {
-                var bindings = File.ReadAllText(bindingsFile);
-                var doc = new XmlDocument();
-                doc.LoadXml(bindings);
-                EDBindings = doc.DocumentElement;
-                //var upNode = doc.DocumentElement.SelectSingleNode("UI_Up/Primary"); //upNode.Attributes["Device"].Value upNode.Attributes["Key"].Value
-                //var downNode = doc.DocumentElement.SelectSingleNode("UI_Down/Primary");
-                //var leftNode = doc.DocumentElement.SelectSingleNode("UI_Left/Primary");
-                //var rightNode = doc.DocumentElement.SelectSingleNode("UI_Right/5Primary");
-            }
-            catch
-            {
-                EDBindings = null;
-            }
-        }
-
-        public static string GetBinding(string binding, string key = "Primary")
-        {
-            if (EDBindings == null)
-                return null;
-            var elem = EDBindings.SelectSingleNode("\\binding\\" + key);
-            return elem?.Value;
-        }
-
-        private static void ApplySettings()
-        {
-            Speech.SelectVoice(Settings.Voice);
-            Speech.Rate = Settings.VoiceRate;
-            Speech.Volume = Settings.VoiceVolume;
-        }
 
         private static string CommanderName { get; set; }
 
@@ -249,7 +142,7 @@ namespace EDVRHUD
             }
             saveData.panels = list.ToArray();
 
-            var s = Serializer.Serialize(saveData);
+            var s = EDCommon.Serializer.Serialize(saveData);
             var path = Environment.CurrentDirectory + "\\Panels.json";
             File.WriteAllText(path, s);
         }
@@ -270,9 +163,10 @@ namespace EDVRHUD
                 content = File.ReadAllText(path);
             else
                 content = Encoding.UTF8.GetString(Properties.Resources.Panels);
-            var json = Serializer.Deserialize<PanelSaveData>(content);
+            var json = EDCommon.Serializer.Deserialize<PanelSaveData>(content);
             foreach (var panelData in json.panels)
             {
+                if (!panelData.Enabled) continue;
                 var panel = HudPanel.Create(panelData);
                 HudPanels.Add(panel);
                 panel.Initialize();
@@ -311,10 +205,10 @@ namespace EDVRHUD
         public void Run()
         {
             EDJournalPath = Path.Combine(GetSavedGamesPath(), "Frontier Developments", "Elite Dangerous");
-            LoadSettings();
+            EDCommon.LoadSettings();
 
 
-            EDCommon.DB = new LiteDatabase("EDVRHUD.db");
+            EDCommon.DB = new LiteDatabase("Filename=EDVRHUD.db;Mode=Shared;");
             EDCommon.DBJournal = EDCommon.DB.GetCollection<Dictionary<string, object>>("Journal");
             EDCommon.DBSettings = EDCommon.DB.GetCollection<Dictionary<string, object>>("Settings");
             RebuildDB();
@@ -326,8 +220,8 @@ namespace EDVRHUD
             //    .ToList();
 
             GetCommander();
-            if (Settings.VoiceEnable)
-                Speech.Speak("Welcome Commander " + CommanderName + ".");
+            if (EDCommon.Settings.VoiceEnable)
+                EDCommon.Speech.Speak("Welcome Commander " + CommanderName + ".");
 
             using (var fontCollection = new PrivateFontCollection())
             {
@@ -353,7 +247,7 @@ namespace EDVRHUD
                     var intersectionParams = new VROverlayIntersectionParams_t();
                     intersectionParams.eOrigin = ETrackingUniverseOrigin.TrackingUniverseSeated;
 
-                    if (Settings.UseOpenVR)
+                    if (EDCommon.Settings.UseOpenVR)
                     {
                         vrSystem = OpenVR.Init(ref err, EVRApplicationType.VRApplication_Overlay);
                         if (err != EVRInitError.None || OpenVR.Compositor == null || OpenVR.Overlay == null)
@@ -386,14 +280,17 @@ namespace EDVRHUD
 
                         StartJournalListening();
 
+
+
+                        HudPanel focusedPanel = null;
                         while (AppRunning)
                         {
-                            if (InitialLoad)
+                            if (EDCommon.InitialLoad)
                             {
                                 lock (ContentLock)
                                 {
                                     if (string.IsNullOrEmpty(CachedContent))
-                                        InitialLoad = false;
+                                        EDCommon.InitialLoad = false;
                                 }
                             }
                             else if (ReplayForm == null)
@@ -415,20 +312,16 @@ namespace EDVRHUD
                                     }
                                 }
 
-                                //need to find a better way to calculate intersection parameters
+                                //TODO: need to find a better way to calculate intersection parameters
                                 vrSystem.GetDeviceToAbsoluteTrackingPose(ETrackingUniverseOrigin.TrackingUniverseSeated, 0, poseArray);
                                 var m = new Matrix(
                                     poseArray[0].mDeviceToAbsoluteTracking.m0, poseArray[0].mDeviceToAbsoluteTracking.m4, poseArray[0].mDeviceToAbsoluteTracking.m8, 0,
                                     poseArray[0].mDeviceToAbsoluteTracking.m1, poseArray[0].mDeviceToAbsoluteTracking.m5, poseArray[0].mDeviceToAbsoluteTracking.m9, 0,
                                     poseArray[0].mDeviceToAbsoluteTracking.m2, poseArray[0].mDeviceToAbsoluteTracking.m6, poseArray[0].mDeviceToAbsoluteTracking.m10, 0,
-                                    poseArray[0].mDeviceToAbsoluteTracking.m3, poseArray[0].mDeviceToAbsoluteTracking.m7, poseArray[0].mDeviceToAbsoluteTracking.m11, 1);
+                                    poseArray[0].mDeviceToAbsoluteTracking.m3, poseArray[0].mDeviceToAbsoluteTracking.m7, poseArray[0].mDeviceToAbsoluteTracking.m11, 0);
                                 m.Decompose(out var s, out var r, out var t);
 
                                 var dir = Vector3.Transform(t, r);
-
-                                //var u = new Vector3(r.X, r.Y, r.Z);
-                                //var sx = r.W;
-                                //var dir = 2.0f * Vector3.Dot(u, t) * u + (sx * sx - Vector3.Dot(u, u)) * t + 2.0f * s * Vector3.Cross(u, t);
 
                                 intersectionParams.vSource.v0 = (float)t.X;
                                 intersectionParams.vSource.v1 = (float)t.Y;
@@ -438,9 +331,21 @@ namespace EDVRHUD
                                 intersectionParams.vDirection.v1 = (float)dir.Y;
                                 intersectionParams.vDirection.v2 = -(float)dir.Z;
 
+                                
+                                HudPanel newFocusedPanel = null;
                                 foreach (var p in HudPanels)
+                                {                                    
                                     intersect |= p.LookAt(ref intersectionParams);
+                                    if (p.HasFocus)
+                                        newFocusedPanel = p;
+                                }
 
+                                if (focusedPanel != newFocusedPanel)
+                                {
+                                    newFocusedPanel?.Redraw();
+                                    focusedPanel?.Redraw();
+                                    focusedPanel = newFocusedPanel;
+                                }
 
                             }
 
@@ -458,38 +363,37 @@ namespace EDVRHUD
                                     if (!string.IsNullOrWhiteSpace(line))
                                     {
                                         //System.Diagnostics.Debug.WriteLine(line);
-                                        var entry = Serializer.Deserialize<Dictionary<string, object>>(line);
+                                        var entry = EDCommon.Serializer.Deserialize<Dictionary<string, object>>(line);
+
+                                        if (!entry.GetProperty("timestamp", "", out var timestamp))
+                                            continue;
+
+                                        if (!DateTime.TryParse(timestamp.ToString(), out var ts))
+                                            continue;
+
+                                        ts = ts.ToUniversalTime();
+
+                                        if (ts < LastJournalTimeStamp)
+                                            continue;
+
+                                        LastJournalTimeStamp = ts;
+                                        //Debug.WriteLine("TS: " + timestamp);
+
+                                        var eventtype = entry.GetProperty("event", "");
+                                        if (string.IsNullOrEmpty(eventtype))
+                                            continue;
+
+                                        var isReplay = entry.GetProperty("IsReplay", false);
+
+                                        //foreach (var p in HudPanels)
+                                        //    p.OnJournalUpdate(eventtype, entry);
+                                        HudPanel.JournalUpdate(eventtype, entry, HudPanels);
+
+                                        //isreplay is used for scans
+                                        if (!isReplay)
                                         {
-                                            if (!entry.GetProperty("timestamp", "", out var timestamp))
-                                                continue;
-
-                                            if (!DateTime.TryParse(timestamp.ToString(), out var ts))
-                                                continue;
-
-                                            ts = ts.ToUniversalTime();
-
-                                            if (ts < LastJournalTimeStamp)
-                                                continue;
-
-                                            LastJournalTimeStamp = ts;
-                                            //Debug.WriteLine("TS: " + timestamp);
-
-                                            var eventtype = entry.GetProperty("event", "");
-                                            if (string.IsNullOrEmpty(eventtype))
-                                                continue;
-
-                                            var isReplay = entry.GetProperty("IsReplay", false);
-
-                                            //foreach (var p in HudPanels)
-                                            //    p.OnJournalUpdate(eventtype, entry);
-                                            HudPanel.JournalUpdate(eventtype, entry, HudPanels);
-
-                                            //isreplay is used for scans
-                                            if (!isReplay)
-                                            {
-                                                var id = new BsonValue(EDCommon.DBIDForEntry(ts, eventtype, entry).ToByteArray());
-                                                EDCommon.DBJournal.Upsert(id, entry);
-                                            }
+                                            var id = new BsonValue(EDCommon.DBIDForEntry(ts, eventtype, entry).ToByteArray());
+                                            EDCommon.DBJournal.Upsert(id, entry);
                                         }
                                     }
                                 }
@@ -497,13 +401,9 @@ namespace EDVRHUD
 
                             bool anyUpdate = false;
                             bool sendStatusFocus = false;
-                            if (GUIFocus != PrevGUIFocus)
+                            if (GUIFocus != PrevGUIFocus || EDFlags != PrevEDFlags)
                             {
                                 PrevGUIFocus = GUIFocus;
-                                sendStatusFocus = true;
-                            }
-                            if (EDFlags != PrevEDFlags)
-                            {
                                 PrevEDFlags = EDFlags;
                                 sendStatusFocus = true;
                             }
@@ -524,12 +424,49 @@ namespace EDVRHUD
                                 }
                             }
 
+                            Application.DoEvents();
+
+                            if (focusedPanel != null)
+                            {
+                                //Debug.WriteLine("Focused panel:" + focusedPanel.Name);
+                                var upScrollState = false;
+                                var downScrollState = false;
+                                lock (EDCommon.InputDevices)
+                                {
+                                    foreach (var joystick in EDCommon.InputDevices)
+                                    {
+                                        joystick.Poll();
+                                        var datas = joystick.GetBufferedData();
+                                        foreach (var state in datas)
+                                        {
+                                            if (EDCommon.Settings.ScrollUp.ObjectOffset == state.RawOffset)
+                                                upScrollState = true;
+                                            if (EDCommon.Settings.ScrollDown.ObjectOffset == state.RawOffset)
+                                                downScrollState = true;
+                                        }
+                                    }
+                                }
+                                if (upScrollState != EDCommon.Settings.ScrollUp.LastState)
+                                {
+                                    EDCommon.Settings.ScrollUp.LastState = upScrollState;
+                                    if (upScrollState)
+                                        focusedPanel.OnScroll(new MouseEventArgs(MouseButtons.None, 0, 0, 0, 120));
+                                }
+                                if (downScrollState != EDCommon.Settings.ScrollDown.LastState)
+                                {
+                                    EDCommon.Settings.ScrollDown.LastState = downScrollState;
+                                    if (downScrollState)
+                                        focusedPanel.OnScroll(new MouseEventArgs(MouseButtons.None, 0, 0, 0, -120));
+                                }
+
+                            }
+
                             if (!anyUpdate && !sendStatusFocus && !intersect)
                                 Thread.Sleep(100);
                             else
                                 Thread.Sleep(1);
 
-                            Application.DoEvents();
+
 
                         }
                         //if (EDJournalReplayThread != null && EDJournalReplayThread.IsAlive)
@@ -565,9 +502,11 @@ namespace EDVRHUD
                 CurrentStream.Dispose();
             CurrentStream = null;
 
-            Shutup();
-            Talk("Farewell Commander " + CommanderName + ".", false);
-            Speech.Dispose();
+            EDCommon.ClearInputDevices();
+
+            EDCommon.Shutup();
+            EDCommon.Talk("Farewell Commander " + CommanderName + ".", false);
+            EDCommon.Speech.Dispose();
 
             EDCommon.DB.Dispose();
         }
@@ -580,7 +519,7 @@ namespace EDVRHUD
 
             var settings = EDCommon.DBSettings.Query().FirstOrDefault() ?? new Dictionary<string, object>();
             var lastJournalFile = settings?.GetProperty("LastJournalFile", "");
-
+            var lastJournalSize = 0L;
             //var reults = EDCommon.DBColl.Query()
             //    .Where(x => x["Radius"] != null && x["PlanetType"] != null)
             //    .OrderBy(x => x["Radius"])
@@ -602,6 +541,7 @@ namespace EDVRHUD
                 lastLog = log;
                 using (var fs = File.Open(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
+                    lastJournalSize = fs.Length;
                     EDCommon.DB.BeginTrans();
                     var bytes = new byte[fs.Length];
                     fs.Read(bytes, 0, bytes.Length);
@@ -611,7 +551,7 @@ namespace EDVRHUD
                     foreach (var line in lines)
                     {
                         if (string.IsNullOrWhiteSpace(line)) continue;
-                        var entry = Serializer.Deserialize<Dictionary<string, object>>(line);
+                        var entry = EDCommon.Serializer.Deserialize<Dictionary<string, object>>(line);
                         if (!entry.GetProperty("timestamp", "", out var timestamp))
                             continue;
 
@@ -632,21 +572,26 @@ namespace EDVRHUD
                 }
             }
 
-            settings["LastJournalFile"] = lastLog;            
+            settings["LastJournalFile"] = lastLog;
+            settings["LastJournalPos"] = lastJournalSize;
             EDCommon.DBSettings.Upsert(new BsonValue(new ObjectId(0, 0, 0, 0).ToByteArray()), settings); //single item in coll
         }
 
-        public static void ReplayScans(long systemAddress)
+        public static void RefreshScans(long systemAddress)
         {
             var scans = new Dictionary<string, Dictionary<string, object>>();
-            var scansResult = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("SystemAddress", new BsonValue(systemAddress)), LiteDB.Query.EQ("event", "Scan")));
+
+            var fssResult = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("SystemAddress", new BsonValue(systemAddress)), LiteDB.Query.EQ("event", "FSSDiscoveryScan"))).LastOrDefault();
+
+            var scansResult = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("SystemAddress", new BsonValue(systemAddress)), LiteDB.Query.EQ("event", "Scan"), LiteDB.Query.Or(LiteDB.Query.Not("StarType", null), LiteDB.Query.Not("PlanetClass", null))));
             foreach (var scan in scansResult)
             {
                 var bodyName = scan.GetProperty("BodyName", "");
                 if (string.IsNullOrEmpty(bodyName))
-                    continue;                
+                    continue;
                 scans[bodyName] = scan;
                 scan["WasDiscovered"] = true;
+                scan["SkipValues"] = true;
             }
 
             var mapResult = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("SystemAddress", new BsonValue(systemAddress)), LiteDB.Query.EQ("event", "SAAScanComplete")));
@@ -659,16 +604,34 @@ namespace EDVRHUD
                 if (s == null)
                     continue;
                 s["WasMapped"] = true;
+                s["SkipValues"] = true;
             }
 
 
             var sb = new StringBuilder();
+            if (fssResult == null)
+            {
+                fssResult = new Dictionary<string, object>
+                {
+                    ["event"] = "FSSDiscoveryScan",
+                    ["Progress"] = 1,
+                    ["BodyCount"] = scans.Count,
+                    ["NonBodyCount"] = 0,
+                    ["SystemAddress"] = systemAddress,
+                    ["SystemName"] = scans.Any() ? scans.First().Value["StarSystem"] : ""
+                };
+            }
+            fssResult.Remove("_id");
+            fssResult["timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+            fssResult["IsReplay"] = true;
+            sb.AppendLine(EDCommon.Serializer.Serialize(fssResult));
+
             foreach (var item in scans)
             {
                 item.Value.Remove("_id");
-                item.Value["IsReplay"] = true;                
+                item.Value["IsReplay"] = true;
                 item.Value["timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
-                sb.AppendLine(Serializer.Serialize(item.Value));
+                sb.AppendLine(EDCommon.Serializer.Serialize(item.Value));
             }
             lock (ContentLock)
                 CachedContent += sb.ToString();
@@ -692,7 +655,9 @@ namespace EDVRHUD
             PrevGUIFocus = GUIFocus.Initial;
             PrevEDFlags = StatusFlags.Initial;
 
-            InitialLoad = true;
+            EDCommon.InitialLoad = true;
+            EDCommon.TravelMapData.Clear();
+            EDCommon.LoadTravelMap("2000-01-01T00:00:00Z");
 
             var startId = EDCommon.DBJournal.Find(LiteDB.Query.And(LiteDB.Query.EQ("event", "StartJump"), LiteDB.Query.EQ("JumpType", "Hyperspace")))
                 .OrderByDescending(x => x["timestamp"])
@@ -704,59 +669,10 @@ namespace EDVRHUD
             var sb = new StringBuilder();
             foreach (var entry in latestEntries)
             {
-                entry.Remove("_id");                
-                sb.AppendLine(Serializer.Serialize(entry));
+                entry.Remove("_id");
+                sb.AppendLine(EDCommon.Serializer.Serialize(entry));
             }
             CachedContent = sb.ToString();
-            //load from db
-            //load last FSDJump 
-            //var skippedFiles = new List<string>();
-            //var files = Directory.EnumerateFiles(EDJournalPath, "Journal.????????????.??.log").OrderByDescending(f => f).ToList();
-            //var jumpFound = false;
-
-            //while (true)
-            //{
-
-            //    var currFile = CurrentJournalFile = files[0];
-            //    files.RemoveAt(0);
-
-            //    LastJournalPosition = 0;
-            //    LastJournalTimeStamp = DateTime.MinValue;
-            //    ReadJournal();
-            //    lock (ContentLock)
-            //    {
-            //        var lines = CachedContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-            //        CachedContent = "";
-            //        for (var i = lines.Length; i > 0; i--)
-            //        {
-            //            var line = lines[i - 1];
-            //            if (string.IsNullOrEmpty(line))
-            //                continue;
-            //            CachedContent = line + Environment.NewLine + CachedContent;
-            //            if (line.Contains("\"event\":\"StartJump\", \"JumpType\":\"Hyperspace\""))
-            //            {
-            //                jumpFound = true;
-            //                break;
-            //            }
-            //        }
-            //    }
-            //    if (jumpFound)
-            //    {
-            //        if (skippedFiles.Count > 0)
-            //        {
-            //            files = skippedFiles;
-            //        }
-            //        else
-            //            break;
-            //    }
-            //    else
-            //    {
-            //        lock (ContentLock)
-            //            CachedContent = "";
-            //        skippedFiles.Add(currFile);
-            //    }
-            //}
-
 
             EDLogWatcher = new FileSystemWatcher(EDJournalPath, "Journal.????????????.??.log")
             {
@@ -765,6 +681,20 @@ namespace EDVRHUD
 
             //EDLogWatcher.Changed += JournalChanged;
             EDLogWatcher.Created += JournalChanged;
+
+            if (CurrentStream != null)
+            {
+                CurrentStream.Dispose();
+                CurrentStream = null;
+            }
+
+            var settings = EDCommon.DBSettings.Query().FirstOrDefault() ?? new Dictionary<string, object>();
+            var lastJournalFile = settings?.GetProperty("LastJournalFile", "");
+            var lastJournalPosition = settings?.GetProperty("LastJournalPos", 0L);
+
+            LastJournalPosition = lastJournalPosition.Value;
+            CurrentStream = File.Open(lastJournalFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            CurrentStream.Seek(LastJournalPosition, SeekOrigin.Begin);
 
             EDLogWatcher.EnableRaisingEvents = true;
             //ReadJournal();
@@ -820,7 +750,7 @@ namespace EDVRHUD
                     var strcontent = Encoding.UTF8.GetString(bytes);
                     if (string.IsNullOrWhiteSpace(strcontent))
                         return;
-                    var status = Serializer.Deserialize<Dictionary<string, object>>(strcontent);
+                    var status = EDCommon.Serializer.Deserialize<Dictionary<string, object>>(strcontent);
                     GUIFocus = (GUIFocus)status.GetProperty("GuiFocus", 0);
                     EDFlags = (StatusFlags)status.GetProperty("Flags", 0L);
                     //if (EDFlags == StatusFlags.None)
@@ -884,7 +814,7 @@ namespace EDVRHUD
 
             var result = EDCommon.DBJournal.Query()
                 .Where(x => x["Commander"] != null)
-                .OrderByDescending(x => x["timestamp"])                   
+                .OrderByDescending(x => x["timestamp"])
                 .FirstOrDefault();
 
             if (result != null)

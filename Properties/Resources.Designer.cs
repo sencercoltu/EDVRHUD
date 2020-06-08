@@ -73,16 +73,6 @@ namespace EDVRHUD.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static System.Drawing.Bitmap Earth {
-            get {
-                object obj = ResourceManager.GetObject("Earth", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Drawing.Bitmap.
-        /// </summary>
         internal static System.Drawing.Bitmap EarthLike {
             get {
                 object obj = ResourceManager.GetObject("EarthLike", resourceCulture);
@@ -97,6 +87,16 @@ namespace EDVRHUD.Properties {
             get {
                 object obj = ResourceManager.GetObject("EUROCAPS", resourceCulture);
                 return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Galaxy {
+            get {
+                object obj = ResourceManager.GetObject("Galaxy", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
             }
         }
         
@@ -265,6 +265,16 @@ namespace EDVRHUD.Properties {
         internal static byte[] SharpDX_Direct3D11 {
             get {
                 object obj = ResourceManager.GetObject("SharpDX_Direct3D11", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] SharpDX_DirectInput {
+            get {
+                object obj = ResourceManager.GetObject("SharpDX_DirectInput", resourceCulture);
                 return ((byte[])(obj));
             }
         }

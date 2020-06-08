@@ -17,6 +17,11 @@ namespace EDVRHUD.HUDs
 
         public JumpInfoPanel(PanelSettings settings) : base("JumpInfo", settings)
         {
+            SubscribeEvents(
+                "JetConeBoost", 
+                "StartJump", 
+                "FSDTarget", 
+                "FSDJump");
         }
 
         private GUIFocus[] VisibleGuiFocus = new[] { GUIFocus.None, GUIFocus.InternalPanel, GUIFocus.ExternalPanel, GUIFocus.CommsPanel, GUIFocus.RolePanel };
@@ -46,7 +51,7 @@ namespace EDVRHUD.HUDs
                         if (eventData.GetProperty("BoostValue", 0.0, out var boost))
                         {
                             JetConeBoost = boost;
-                            NotificationApp.Talk("FSD boosted by " + JetConeBoost.ToString("0.#") + " times.");
+                            EDCommon.Talk("FSD boosted by " + JetConeBoost.ToString("0.#") + " times.");
                             Redraw();
                         }
                     }
@@ -86,13 +91,13 @@ namespace EDVRHUD.HUDs
                     {
                         //reset jcb
                         //if (RemainingJumps == 1) RemainingJumps = 0;
-                        NotificationApp.Shutup();
+                        EDCommon.Shutup();
                         JetConeBoost = 1;
                         Redraw();
                         if (RemainingJumps == 0 && ActiveRoute)
                         {
                             ActiveRoute = false;
-                            NotificationApp.Talk("Arrived at route destination " + TargetStarSystem);
+                            EDCommon.Talk("Arrived at route destination " + TargetStarSystem);
                         }
                     }
                     break;
@@ -139,6 +144,7 @@ namespace EDVRHUD.HUDs
                 x += IconSize;
                 str = " " + JetConeBoost.ToString("N1", CultureInfo.InvariantCulture);
                 g.DrawString(str, NotificationApp.EDFont, NotificationApp.DefaultBrush, x, y + 4);
+
 
                 g.Flush();
             }

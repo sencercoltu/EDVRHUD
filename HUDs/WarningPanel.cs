@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Text;
-using Valve.VR;
 
 namespace EDVRHUD.HUDs
 {
@@ -10,14 +9,12 @@ namespace EDVRHUD.HUDs
     {
         private string DangerousStarName = "";
 
-        //public WarningPanel(Size size, ref HmdMatrix34_t position) : base(HudType.Warning, "Warning", size, position)
-        //{
-        //    ShowPanel(false);
-        //}
-
         public WarningPanel(PanelSettings settings) : base("Warning", settings)
         {
             ShowPanel(false);
+            SubscribeEvents(
+                "StartJump", 
+                "FSDJump");
         }
 
         public override void Initialize()
@@ -67,7 +64,7 @@ namespace EDVRHUD.HUDs
                                 Redraw();
                                 //NotificationApp.Speech.SpeakAsyncCancelAll();
                                 if (!string.IsNullOrEmpty(DangerousStarName))
-                                    NotificationApp.Talk("Warning! Destination is a " + DangerousStarName + ".");
+                                    EDCommon.Talk("Warning! Destination is a " + DangerousStarName + ".");
                             }
                         }
                         else
@@ -91,18 +88,13 @@ namespace EDVRHUD.HUDs
 
         private Brush BackgroundBrush = new SolidBrush(Color.FromArgb(30, 0, 0, 0));
         private Brush WarningBrush = new SolidBrush(Color.FromArgb(255, 255, 0, 0));
-
         private StringFormat WarningFormat = new StringFormat
         {
             LineAlignment = StringAlignment.Center,
             Alignment = StringAlignment.Center
         };
-        
-        //private int IconSize = 80;
-
         private Pen TopLinePen = new Pen(Color.FromArgb(255, 200, 0, 0), 3f);
         private Pen BottomLinePen = new Pen(Color.FromArgb(255, 255, 0, 0), 3f);
-
 
         protected override void OnRedrawPanel()
         {

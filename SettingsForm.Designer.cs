@@ -31,6 +31,9 @@
             this.btnApply = new System.Windows.Forms.Button();
             this.chkDisableVR = new System.Windows.Forms.CheckBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.chkSignals = new System.Windows.Forms.CheckBox();
+            this.chkNBS = new System.Windows.Forms.CheckBox();
+            this.chkDSI = new System.Windows.Forms.CheckBox();
             this.cmbVoices = new System.Windows.Forms.ComboBox();
             this.chkVoiceEnable = new System.Windows.Forms.CheckBox();
             this.label2 = new System.Windows.Forms.Label();
@@ -38,17 +41,20 @@
             this.tbVolume = new System.Windows.Forms.TrackBar();
             this.tbRate = new System.Windows.Forms.TrackBar();
             this.chkADS = new System.Windows.Forms.CheckBox();
-            this.chkDSI = new System.Windows.Forms.CheckBox();
-            this.chkNBS = new System.Windows.Forms.CheckBox();
-            this.chkSignals = new System.Windows.Forms.CheckBox();
+            this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.label3 = new System.Windows.Forms.Label();
+            this.cmbScrollUp = new System.Windows.Forms.ComboBox();
+            this.cmbScrollDown = new System.Windows.Forms.ComboBox();
+            this.label4 = new System.Windows.Forms.Label();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.tbVolume)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tbRate)).BeginInit();
+            this.groupBox2.SuspendLayout();
             this.SuspendLayout();
             // 
             // btnApply
             // 
-            this.btnApply.Location = new System.Drawing.Point(248, 282);
+            this.btnApply.Location = new System.Drawing.Point(248, 306);
             this.btnApply.Name = "btnApply";
             this.btnApply.Size = new System.Drawing.Size(75, 23);
             this.btnApply.TabIndex = 6;
@@ -59,7 +65,7 @@
             // chkDisableVR
             // 
             this.chkDisableVR.AutoSize = true;
-            this.chkDisableVR.Location = new System.Drawing.Point(7, 286);
+            this.chkDisableVR.Location = new System.Drawing.Point(7, 310);
             this.chkDisableVR.Name = "chkDisableVR";
             this.chkDisableVR.Size = new System.Drawing.Size(162, 17);
             this.chkDisableVR.TabIndex = 10;
@@ -79,10 +85,40 @@
             this.groupBox1.Controls.Add(this.tbRate);
             this.groupBox1.Location = new System.Drawing.Point(12, 12);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(316, 216);
+            this.groupBox1.Size = new System.Drawing.Size(316, 162);
             this.groupBox1.TabIndex = 11;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Voice";
+            // 
+            // chkSignals
+            // 
+            this.chkSignals.AutoSize = true;
+            this.chkSignals.Location = new System.Drawing.Point(6, 129);
+            this.chkSignals.Name = "chkSignals";
+            this.chkSignals.Size = new System.Drawing.Size(107, 17);
+            this.chkSignals.TabIndex = 15;
+            this.chkSignals.Text = "Detected Signals";
+            this.chkSignals.UseVisualStyleBackColor = true;
+            // 
+            // chkNBS
+            // 
+            this.chkNBS.AutoSize = true;
+            this.chkNBS.Location = new System.Drawing.Point(168, 106);
+            this.chkNBS.Name = "chkNBS";
+            this.chkNBS.Size = new System.Drawing.Size(136, 17);
+            this.chkNBS.TabIndex = 14;
+            this.chkNBS.Text = "EDSM Nearby Systems";
+            this.chkNBS.UseVisualStyleBackColor = true;
+            // 
+            // chkDSI
+            // 
+            this.chkDSI.AutoSize = true;
+            this.chkDSI.Location = new System.Drawing.Point(6, 106);
+            this.chkDSI.Name = "chkDSI";
+            this.chkDSI.Size = new System.Drawing.Size(134, 17);
+            this.chkDSI.TabIndex = 13;
+            this.chkDSI.Text = "EDSM Dst System Info";
+            this.chkDSI.UseVisualStyleBackColor = true;
             // 
             // cmbVoices
             // 
@@ -140,48 +176,72 @@
             // chkADS
             // 
             this.chkADS.AutoSize = true;
-            this.chkADS.Location = new System.Drawing.Point(7, 263);
+            this.chkADS.Location = new System.Drawing.Point(7, 287);
             this.chkADS.Name = "chkADS";
             this.chkADS.Size = new System.Drawing.Size(172, 17);
             this.chkADS.TabIndex = 12;
             this.chkADS.Text = "Auto Discovery Scan on arrival";
             this.chkADS.UseVisualStyleBackColor = true;
             // 
-            // chkDSI
+            // groupBox2
             // 
-            this.chkDSI.AutoSize = true;
-            this.chkDSI.Location = new System.Drawing.Point(6, 106);
-            this.chkDSI.Name = "chkDSI";
-            this.chkDSI.Size = new System.Drawing.Size(134, 17);
-            this.chkDSI.TabIndex = 13;
-            this.chkDSI.Text = "EDSM Dst System Info";
-            this.chkDSI.UseVisualStyleBackColor = true;
+            this.groupBox2.Controls.Add(this.cmbScrollDown);
+            this.groupBox2.Controls.Add(this.label4);
+            this.groupBox2.Controls.Add(this.cmbScrollUp);
+            this.groupBox2.Controls.Add(this.label3);
+            this.groupBox2.Location = new System.Drawing.Point(13, 181);
+            this.groupBox2.Name = "groupBox2";
+            this.groupBox2.Size = new System.Drawing.Size(315, 100);
+            this.groupBox2.TabIndex = 13;
+            this.groupBox2.TabStop = false;
+            this.groupBox2.Text = "Interaction";
             // 
-            // chkNBS
+            // label3
             // 
-            this.chkNBS.AutoSize = true;
-            this.chkNBS.Location = new System.Drawing.Point(168, 106);
-            this.chkNBS.Name = "chkNBS";
-            this.chkNBS.Size = new System.Drawing.Size(136, 17);
-            this.chkNBS.TabIndex = 14;
-            this.chkNBS.Text = "EDSM Nearby Systems";
-            this.chkNBS.UseVisualStyleBackColor = true;
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(6, 25);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(50, 13);
+            this.label3.TabIndex = 10;
+            this.label3.Text = "Scroll Up";
             // 
-            // chkSignals
+            // cmbScrollUp
             // 
-            this.chkSignals.AutoSize = true;
-            this.chkSignals.Location = new System.Drawing.Point(6, 129);
-            this.chkSignals.Name = "chkSignals";
-            this.chkSignals.Size = new System.Drawing.Size(107, 17);
-            this.chkSignals.TabIndex = 15;
-            this.chkSignals.Text = "Detected Signals";
-            this.chkSignals.UseVisualStyleBackColor = true;
+            this.cmbScrollUp.DisplayMember = "Display";
+            this.cmbScrollUp.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbScrollUp.DropDownWidth = 500;
+            this.cmbScrollUp.FormattingEnabled = true;
+            this.cmbScrollUp.Location = new System.Drawing.Point(73, 22);
+            this.cmbScrollUp.Name = "cmbScrollUp";
+            this.cmbScrollUp.Size = new System.Drawing.Size(230, 21);
+            this.cmbScrollUp.TabIndex = 11;
+            // 
+            // cmbScrollDown
+            // 
+            this.cmbScrollDown.DisplayMember = "Display";
+            this.cmbScrollDown.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbScrollDown.DropDownWidth = 500;
+            this.cmbScrollDown.FormattingEnabled = true;
+            this.cmbScrollDown.Location = new System.Drawing.Point(73, 48);
+            this.cmbScrollDown.Name = "cmbScrollDown";
+            this.cmbScrollDown.Size = new System.Drawing.Size(230, 21);
+            this.cmbScrollDown.TabIndex = 13;
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(6, 51);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(64, 13);
+            this.label4.TabIndex = 12;
+            this.label4.Text = "Scroll Down";
             // 
             // SettingsForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(337, 363);
+            this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.chkADS);
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.chkDisableVR);
@@ -198,6 +258,8 @@
             this.groupBox1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.tbVolume)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tbRate)).EndInit();
+            this.groupBox2.ResumeLayout(false);
+            this.groupBox2.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -217,5 +279,10 @@
         private System.Windows.Forms.CheckBox chkDSI;
         private System.Windows.Forms.CheckBox chkNBS;
         private System.Windows.Forms.CheckBox chkSignals;
+        private System.Windows.Forms.GroupBox groupBox2;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.ComboBox cmbScrollUp;
+        private System.Windows.Forms.ComboBox cmbScrollDown;
+        private System.Windows.Forms.Label label4;
     }
 }

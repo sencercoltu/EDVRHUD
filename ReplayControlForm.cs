@@ -24,7 +24,7 @@ namespace EDVRHUD
 
         private void tbRate_ValueChanged(object sender, EventArgs e)
         {
-            ReplayRate = (1000 - tbRate.Value) + 1;
+            ReplayRate = (1000 - tbRate.Value);
             lblRate.Text = tbRate.Value.ToString();
         }
 
@@ -33,6 +33,7 @@ namespace EDVRHUD
         private int ReplayRate = 1000;
         private bool ReplayBreakOnFSDJump = false;
         private bool ReplayBreak = false;
+        private bool BeginOfReplay = true;
 
         private JavaScriptSerializer Serializer = new JavaScriptSerializer();
 
@@ -46,11 +47,17 @@ namespace EDVRHUD
                 dtpStartTime.Enabled = false;
                 ReplayThread = new Thread(() =>
                 {
+                    if (!BeginOfReplay && !ReplayEntries.Any())
+                        BeginOfReplay = true;
+
                     while (ReplayRunning)
                     {
                         if (!ThreadTick())
                             break;
-                        Thread.Sleep(ReplayRate);
+                        if (ReplayRate > 0)
+                            Thread.Sleep(ReplayRate);
+                        //else
+                        //    Application.DoEvents();
                     }
 
                     Invoke((Action)(() =>
@@ -84,15 +91,18 @@ namespace EDVRHUD
         private DateTime SimTime;        
         private bool ThreadTick()
         {
-            if (!ReplayEntries.Any())
+            if (BeginOfReplay)
             {
+                BeginOfReplay = false;
                 SimTime = dtpStartDate.Value.Date;
                 SimTime.Add(dtpStartTime.Value.TimeOfDay);
-                var simEndTime = SimTime.Date.AddDays(1).AddSeconds(-1);
+                SimTime = SimTime.ToUniversalTime();
+                var simEndTime = /*SimTime.Date*/DateTime.UtcNow.AddDays(1).AddSeconds(-1);
                 var s = new BsonValue(SimTime.ToString("yyyy-MM-ddTHH:mm:ssZ"));
                 var e = new BsonValue(simEndTime.ToString("yyyy-MM-ddTHH:mm:ssZ"));
                 ReplayEntries = EDCommon.DBJournal.Find(LiteDB.Query.Between("timestamp", s, e)).ToList();
                 NotificationApp.LastJournalTimeStamp = DateTime.MinValue;
+                EDCommon.TravelMapData.Clear();
                 ReplayBreak = false;                
             }
 
@@ -115,7 +125,7 @@ namespace EDVRHUD
             }
             tsdt = tsdt.ToUniversalTime();
 
-            Invoke((Action)(() => { lblTimestamp.Text = ts + "/" + ReplayEntries.Count; }));
+            BeginInvoke((Action)(() => { lblTimestamp.Text = ts + "/" + ReplayEntries.Count; }));
 
             entry.Remove("_id");
             entry.Remove("SimTime");
@@ -150,11 +160,13 @@ namespace EDVRHUD
         private void dtpStartDate_ValueChanged(object sender, EventArgs e)
         {
             ReplayEntries.Clear();
+            BeginOfReplay = true;
         }
 
         private void dtpStartTime_ValueChanged(object sender, EventArgs e)
         {
             ReplayEntries.Clear();
+            BeginOfReplay = true;
         }
 
 
