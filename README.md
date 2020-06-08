@@ -1,7 +1,12 @@
 # EDVRHUD Extensions
 Elite Dangerous Virtual Reality Heads Up Display Extensions for SteamVR
 
-<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanelVR.png?raw=true"/><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanelVR.png?raw=true"/>
+<table border="0">
+  <tr>
+    <td><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanelVR.png?raw=true"/></td>
+    <td><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/JumpPanelVR.png?raw=true"/></td>
+  </tr>
+</table>
 
 Tool for deep space exploration. Existing ones were not designed for VR, I needed to take off my headset frequently.
 Mirroring windows into the headset was too difficult to read, needed interaction.
@@ -23,7 +28,12 @@ Pops up when jumping to a dangerous star like black hole, white dwarf or neutron
 History of last 100 jumps in 2D.
 
 ### Scan Panel
-<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel2.png?raw=true"/>
+<table border="0">
+  <tr>
+    <td><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel.png?raw=true"/></td>
+    <td><img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/ScanInfoPanel2.png?raw=true"/></td>
+  </tr>
+</table>
 Top line shows signal count in system, total estimated credits for your discoveries, and discovery percentage. 
 Rest lists most valuable bodies. List is sorted according to planet values and body features. The repeating system name included in body names are removed, instead I used the body type.
 
