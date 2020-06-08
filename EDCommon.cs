@@ -327,7 +327,7 @@ namespace EDVRHUD
             if (Settings.ScrollUp.InstanceGuid != Guid.Empty)
             {
                 var joystick = new Joystick(DirectInput, Settings.ScrollUp.InstanceGuid);
-                joystick.Properties.BufferSize = 256;
+                joystick.Properties.BufferSize = 32;
                 lock (EDCommon.InputDevices)
                     InputDevices.Add(joystick);
                 joystick.Acquire();
@@ -335,7 +335,7 @@ namespace EDVRHUD
             if (Settings.ScrollDown.InstanceGuid != Guid.Empty)
             {
                 var joystick = new Joystick(DirectInput, Settings.ScrollDown.InstanceGuid);
-                joystick.Properties.BufferSize = 256;
+                joystick.Properties.BufferSize = 32;
                 lock (EDCommon.InputDevices)
                     InputDevices.Add(joystick);
                 joystick.Acquire();

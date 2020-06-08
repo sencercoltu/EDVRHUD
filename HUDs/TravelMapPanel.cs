@@ -143,7 +143,8 @@ namespace EDVRHUD.HUDs
                         pt = new PointF(w + (item.Coords[0] - MapShift.X) / 45000f * w * Zoom, h - (item.Coords[2] - MapShift.Y) / 45000f * h * Zoom);
                         if (!item.IsReset)
                         {
-                            g.DrawLine(TravelPen, lastLoc.X, lastLoc.Y, pt.X, pt.Y);
+                            if (lastInfo != null)
+                                g.DrawLine(TravelPen, lastLoc.X, lastLoc.Y, pt.X, pt.Y);
                             g.DrawEllipse(StarPen, pt.X - 1, pt.Y - 1, 5, 5);
                         }
                         else
