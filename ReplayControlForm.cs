@@ -95,7 +95,7 @@ namespace EDVRHUD
             {
                 BeginOfReplay = false;
                 SimTime = dtpStartDate.Value.Date;
-                SimTime.Add(dtpStartTime.Value.TimeOfDay);                
+                SimTime = SimTime.Add(dtpStartTime.Value.TimeOfDay);                
                 var simEndTime = /*SimTime.Date*/DateTime.UtcNow.AddDays(1).AddSeconds(-1);
                 var s = new BsonValue(SimTime.ToString("yyyy-MM-ddTHH:mm:ssZ"));
                 var e = new BsonValue(simEndTime.ToString("yyyy-MM-ddTHH:mm:ssZ"));

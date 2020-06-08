@@ -42,10 +42,11 @@
             this.tbRate = new System.Windows.Forms.TrackBar();
             this.chkADS = new System.Windows.Forms.CheckBox();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
-            this.label3 = new System.Windows.Forms.Label();
-            this.cmbScrollUp = new System.Windows.Forms.ComboBox();
             this.cmbScrollDown = new System.Windows.Forms.ComboBox();
             this.label4 = new System.Windows.Forms.Label();
+            this.cmbScrollUp = new System.Windows.Forms.ComboBox();
+            this.label3 = new System.Windows.Forms.Label();
+            this.chkAutoDethrottle = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.tbVolume)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tbRate)).BeginInit();
@@ -196,26 +197,6 @@
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Interaction";
             // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(6, 25);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(50, 13);
-            this.label3.TabIndex = 10;
-            this.label3.Text = "Scroll Up";
-            // 
-            // cmbScrollUp
-            // 
-            this.cmbScrollUp.DisplayMember = "Display";
-            this.cmbScrollUp.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbScrollUp.DropDownWidth = 500;
-            this.cmbScrollUp.FormattingEnabled = true;
-            this.cmbScrollUp.Location = new System.Drawing.Point(73, 22);
-            this.cmbScrollUp.Name = "cmbScrollUp";
-            this.cmbScrollUp.Size = new System.Drawing.Size(230, 21);
-            this.cmbScrollUp.TabIndex = 11;
-            // 
             // cmbScrollDown
             // 
             this.cmbScrollDown.DisplayMember = "Display";
@@ -236,11 +217,42 @@
             this.label4.TabIndex = 12;
             this.label4.Text = "Scroll Down";
             // 
+            // cmbScrollUp
+            // 
+            this.cmbScrollUp.DisplayMember = "Display";
+            this.cmbScrollUp.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbScrollUp.DropDownWidth = 500;
+            this.cmbScrollUp.FormattingEnabled = true;
+            this.cmbScrollUp.Location = new System.Drawing.Point(73, 22);
+            this.cmbScrollUp.Name = "cmbScrollUp";
+            this.cmbScrollUp.Size = new System.Drawing.Size(230, 21);
+            this.cmbScrollUp.TabIndex = 11;
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(6, 25);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(50, 13);
+            this.label3.TabIndex = 10;
+            this.label3.Text = "Scroll Up";
+            // 
+            // chkAutoDethrottle
+            // 
+            this.chkAutoDethrottle.AutoSize = true;
+            this.chkAutoDethrottle.Location = new System.Drawing.Point(228, 287);
+            this.chkAutoDethrottle.Name = "chkAutoDethrottle";
+            this.chkAutoDethrottle.Size = new System.Drawing.Size(95, 17);
+            this.chkAutoDethrottle.TabIndex = 14;
+            this.chkAutoDethrottle.Text = "Auto dethrottle";
+            this.chkAutoDethrottle.UseVisualStyleBackColor = true;
+            // 
             // SettingsForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(337, 363);
+            this.Controls.Add(this.chkAutoDethrottle);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.chkADS);
             this.Controls.Add(this.groupBox1);
@@ -284,5 +296,6 @@
         private System.Windows.Forms.ComboBox cmbScrollUp;
         private System.Windows.Forms.ComboBox cmbScrollDown;
         private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.CheckBox chkAutoDethrottle;
     }
 }

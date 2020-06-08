@@ -116,7 +116,7 @@ namespace EDVRHUD.HUDs
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     g.TextRenderingHint = TextRenderingHint.AntiAlias;                    
                     //g.DrawImage(Properties.Resources.Skull, imgOrigin.X, imgOrigin.Y, IconSize, IconSize);
-                    var str = "WARNING!" + Environment.NewLine + "Approaching a " + DangerousStarName + "." + Environment.NewLine + "Throttle down advised.";
+                    var str = "WARNING!" + Environment.NewLine + "Approaching a " + DangerousStarName + "." + Environment.NewLine + "Dethrottle advised.";
                     g.DrawString(str, NotificationApp.EDFont, WarningBrush, rect, WarningFormat);
                 }
                 g.Flush();

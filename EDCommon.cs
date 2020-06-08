@@ -201,6 +201,7 @@ namespace EDVRHUD
         public int VoiceVolume { get; set; } = 100; //0 to 100
         public bool UseOpenVR { get; set; } = true;
         public bool AutoDiscoveryScan { get; set; } = false;
+        public bool AutoDethrottle { get; set; } = false;
         public bool EDSMDestinationSystem { get; set; } = false;
         public bool EDSMNearbySystems { get; set; } = false;
         public bool Signals { get; set; } = false;

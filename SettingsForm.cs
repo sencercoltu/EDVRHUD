@@ -43,8 +43,10 @@ namespace EDVRHUD
             tbVolume.Value = EDCommon.Settings.VoiceVolume;
             chkDisableVR.Checked = !EDCommon.Settings.UseOpenVR;
             chkADS.Checked = EDCommon.Settings.AutoDiscoveryScan;
+            chkAutoDethrottle.Checked = EDCommon.Settings.AutoDethrottle;
             chkNBS.Checked = EDCommon.Settings.EDSMNearbySystems;
             chkDSI.Checked = EDCommon.Settings.EDSMDestinationSystem;
+            
             chkSignals.Checked = EDCommon.Settings.Signals;
 
             var idx = cmbScrollDown.FindStringExact(EDCommon.Settings.ScrollDown.Display);
@@ -69,6 +71,7 @@ namespace EDVRHUD
             EDCommon.Settings.VoiceEnable = chkVoiceEnable.Checked;
             EDCommon.Settings.UseOpenVR = !chkDisableVR.Checked;
             EDCommon.Settings.AutoDiscoveryScan = chkADS.Checked;
+            EDCommon.Settings.AutoDethrottle = chkAutoDethrottle.Checked;
             EDCommon.Settings.EDSMNearbySystems = chkNBS.Checked;
             EDCommon.Settings.EDSMDestinationSystem = chkDSI.Checked;
             EDCommon.Settings.Signals = chkSignals.Checked;
