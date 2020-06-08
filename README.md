@@ -18,7 +18,7 @@ Shows remaining jumps to route, the current star type, and your FSD boost.
 Pops up when jumping to a dangerous star like black hole, white dwarf or neutron star.
 
 ### Travel History Panel
-<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/TravelHistory.png?raw=true"/>
+<img src="https://github.com/sencercoltu/EDVRHUD/blob/master/images/TravelHistoryMap.png?raw=true"/>
 History of last 100 jumps in 2D.
 
 ### Scan Panel
