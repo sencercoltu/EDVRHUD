@@ -5,7 +5,8 @@ Elite Dangerous Virtual Reality Heads Up Display Extensions for SteamVR
 
 Tool for deep space exploration. Existing ones were not designed for VR, I needed to take off my headset frequently.
 Mirroring windows into the headset was too difficult to read, needed interaction.
-I wrote this little extension so I don't need to remove the headset and my hands are always on HOTAS.
+I wrote this extension primarily for my own needs, so I don't need to remove the headset frequently, and my hands are always on throttle & stick (=HOTAS).
+
 
 Currently there are only 4 exploration panels added. But panels can easily be added for other roles.
 
